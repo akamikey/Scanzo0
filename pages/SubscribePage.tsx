@@ -175,9 +175,9 @@ const SubscribePage: React.FC = () => {
         // Handle redirect flow (fallback links)
         if (data.is_fallback || !data.key_id) {
             if (data.short_url) {
-                // Append plan id to return URL if possible, or just redirect
-                // For simplicity, we assume the return URL is configured in Razorpay dashboard
-                window.location.href = data.short_url;
+                // Use window.open for fallback links to avoid X-Frame-Options issues in iframes
+                window.open(data.short_url, '_blank');
+                setProcessingId(null);
                 return;
             } else {
                 throw new Error('No payment URL received');
@@ -213,6 +213,7 @@ const SubscribePage: React.FC = () => {
 
     } catch (error: any) {
         console.error('Payment error:', error);
+        alert(`Payment error: ${error.message || 'Unknown error'}`);
         setPaymentStatus('cancelled');
         setActivePlanId(plan.id);
         setProcessingId(null);

@@ -204,8 +204,6 @@ app.post('/api/webhook/razorpay', async (req: any, res) => {
             }
 
             // 1. Insert into 'subscriptions' table
-            // We use insert because razorpay_subscription_id column doesn't exist
-            // and we want to keep history. AuthContext picks the latest active one.
             const endDate = new Date(sub.current_end * 1000).toISOString();
             
             const { error: subError } = await supabase
@@ -435,7 +433,7 @@ app.use((req, res) => {
 });
 
 // For Vercel deployment, we export the app and only listen if not in a serverless environment
-if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+if (!process.env.VERCEL) {
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on http://localhost:${PORT}`);
     
