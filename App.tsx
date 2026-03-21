@@ -5,7 +5,6 @@ import Header from './components/Header';
 import Dashboard from './pages/Dashboard';
 import QrCodePage from './pages/QrCodePage';
 import SettingsPage from './pages/SettingsPage';
-import AiAssistant from './pages/AiAssistant';
 import Insights from './pages/Insights';
 import GoogleLinkPage from './pages/GoogleLinkPage';
 import PublicReviewPage from './pages/PublicReviewPage';
@@ -23,7 +22,7 @@ import ScanLandingPage from './pages/ScanLandingPage';
 import AuthModal from './components/AuthModal';
 import { AnimatePresence, motion } from 'framer-motion';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { Home, BarChart2, QrCode, CreditCard, Settings, Bot, ShieldCheck, Star, Sparkles, Link as LinkIcon } from 'lucide-react';
+import { Home, BarChart2, QrCode, CreditCard, Settings, Star, Sparkles, Link as LinkIcon } from 'lucide-react';
 import clsx from 'clsx';
 
 // Automatically scroll main content to top on route change
@@ -55,10 +54,10 @@ const BottomNav = () => {
   const location = useLocation();
   const navItems = [
     { path: '/dashboard', icon: Home, label: 'Home' },
-    { path: '/ai-assistant', icon: Sparkles, label: 'AI Coach' },
+    { path: '/insights', icon: BarChart2, label: 'Insights' },
     { path: '/qr-code', icon: QrCode, label: 'QR' },
     { path: '/google-link', icon: LinkIcon, label: 'Link' },
-    { path: '/insights', icon: BarChart2, label: 'Insights' },
+    { path: '/subscribe', icon: CreditCard, label: 'Pricing' },
     { path: '/settings', icon: Settings, label: 'Settings' },
   ];
 
@@ -113,7 +112,6 @@ const AnimatedRoutes = () => {
         <Route path="/terms" element={<PageWrapper><TermsPage /></PageWrapper>} />
         <Route path="/logo" element={<PageWrapper><LogoPage /></PageWrapper>} />
         <Route path="/dashboard" element={<PageWrapper><Dashboard /></PageWrapper>} />
-        <Route path="/ai-assistant" element={<PageWrapper><AiAssistant /></PageWrapper>} />
         <Route path="/insights" element={<PageWrapper><Insights /></PageWrapper>} />
         <Route path="/qr-code" element={<PageWrapper><QrCodePage /></PageWrapper>} />
         <Route path="/google-link" element={<PageWrapper><GoogleLinkPage /></PageWrapper>} />

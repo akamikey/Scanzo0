@@ -30,8 +30,8 @@ const supabase = (supabaseUrl && supabaseKey)
 
 // Initialize Razorpay
 const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID || 'rzp_live_SM4JPqCFdqdZ4X',
-  key_secret: process.env.RAZORPAY_KEY_SECRET || 'VIvR1Uk5Hvq0FtHxnf85TXhg',
+  key_id: process.env.RAZORPAY_KEY_ID || 'rzp_live_STxlKmH3jUfhCg',
+  key_secret: process.env.RAZORPAY_KEY_SECRET || 'QyH1Z6s0wV6N23z7XRmEe53q',
 });
 
 app.use(cors());
@@ -51,15 +51,15 @@ const getCleanPlanId = (envVar: string | undefined, fallback: string) => {
 
 const PLAN_CONFIG: Record<string, { id: string | undefined, total_count: number }> = {
   'monthly': { 
-    id: getCleanPlanId(process.env.RAZORPAY_PLAN_MONTHLY, 'plan_SBmRucECQ7R5dJ'),
+    id: getCleanPlanId(process.env.RAZORPAY_PLAN_MONTHLY, 'plan_STxKdWOYODRHqL'),
     total_count: 60 // 5 years
   },
   'biannual': { 
-    id: getCleanPlanId(process.env.RAZORPAY_PLAN_BIANNUAL, 'plan_SBmc0r5xUg65iM'),
+    id: getCleanPlanId(process.env.RAZORPAY_PLAN_BIANNUAL, 'plan_STxMY7FBbIvQcJ'),
     total_count: 10 // 5 years
   },
   'annual': { 
-    id: getCleanPlanId(process.env.RAZORPAY_PLAN_ANNUAL, 'plan_SM3t9nNkfUECGe'),
+    id: getCleanPlanId(process.env.RAZORPAY_PLAN_ANNUAL, 'plan_STxNeYFeyNGw6J'),
     total_count: 5 // 5 years
   },
   'test': {
@@ -89,7 +89,14 @@ app.post('/api/create-subscription', async (req, res) => {
       return res.status(400).json({ error: 'Invalid Plan ID configuration' });
     }
 
-    const razorpayPlanId = planConfig.id;
+    let razorpayPlanId = planConfig.id;
+
+    // If the configured ID is actually a URL, move it to fallback links
+    if (razorpayPlanId && razorpayPlanId.startsWith('http')) {
+        console.log(`Detected URL in Plan ID for ${planId}. Using as fallback link.`);
+        FALLBACK_LINKS[planId] = razorpayPlanId;
+        razorpayPlanId = undefined;
+    }
 
     // Helper to return fallback response
     const returnFallback = () => {
@@ -107,8 +114,9 @@ app.post('/api/create-subscription', async (req, res) => {
         });
     };
 
-    // If no Razorpay Plan ID is configured, use fallback link immediately
+    // If no Razorpay Plan ID or Key ID is configured, use fallback link immediately
     if (!razorpayPlanId || 
+        !process.env.RAZORPAY_KEY_ID ||
         razorpayPlanId.includes('plan_monthly_id') || 
         razorpayPlanId.includes('plan_biannual_id') || 
         razorpayPlanId.includes('plan_annual_id')) {
@@ -136,7 +144,7 @@ app.post('/api/create-subscription', async (req, res) => {
         id: subscription.id,
         short_url: subscription.short_url,
         status: subscription.status,
-        key_id: process.env.RAZORPAY_KEY_ID // Send public key to frontend
+        key_id: process.env.RAZORPAY_KEY_ID || 'rzp_live_STxlKmH3jUfhCg' // Send the same key used for initialization
       });
     } catch (apiError: any) {
       const errorDesc = apiError.error?.description || apiError.message;
@@ -161,17 +169,20 @@ app.post('/api/create-subscription', async (req, res) => {
 
 // 2. Webhook Handler
 app.post('/api/webhook/razorpay', async (req: any, res) => {
-  const secret = process.env.RAZORPAY_WEBHOOK_SECRET || '123456';
+  const secret = process.env.RAZORPAY_WEBHOOK_SECRET || 'scanzo123';
 
-  if (process.env.RAZORPAY_WEBHOOK_SECRET === undefined) {
-      console.warn('Warning: RAZORPAY_WEBHOOK_SECRET is not set. Using default secret "123456". Ensure this matches your Razorpay Dashboard setting.');
+  if (!secret) {
+    console.error('RAZORPAY_WEBHOOK_SECRET is not set. Webhook verification failed.');
+    return res.status(400).json({ error: 'Webhook secret not configured' });
   }
   
   const shasum = crypto.createHmac('sha256', secret);
   shasum.update(req.body); // req.body is buffer due to bodyParser.raw
   const digest = shasum.digest('hex');
 
-  if (digest === req.headers['x-razorpay-signature']) {
+  const signature = req.headers['x-razorpay-signature'];
+
+  if (digest === signature) {
     console.log('Webhook verified');
     
     try {

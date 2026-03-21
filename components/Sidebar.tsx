@@ -12,11 +12,10 @@ interface SidebarProps {
 
 const NAV_ITEMS = [
   { path: '/dashboard', label: 'Dashboard', icon: Home },
-  { path: '/ai-assistant', label: 'AI Coach', icon: Sparkles },
-  { path: '/qr-code', label: 'QR Code', icon: QrCode },
-  { path: '/google-link', label: 'Google Link', icon: LinkIcon },
   { path: '/insights', label: 'Insights', icon: BarChart2 },
-  { path: '/subscribe', label: 'Subscribe', icon: CreditCard },
+  { path: '/google-link', label: 'Google Link', icon: LinkIcon },
+  { path: '/qr-code', label: 'QR Code', icon: QrCode },
+  { path: '/subscribe', label: 'Pricing', icon: CreditCard },
   { path: '/settings', label: 'Settings', icon: Settings },
 ];
 

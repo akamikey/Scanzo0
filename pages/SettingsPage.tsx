@@ -142,68 +142,6 @@ const SettingsPage: React.FC = () => {
         </div>
       </div>
 
-      {subscription?.isActive ? (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="w-full relative overflow-hidden rounded-2xl border border-green-200 dark:border-green-500/30 bg-green-50/30 dark:bg-green-900/10 backdrop-blur-xl shadow-lg p-4 flex items-center justify-between group cursor-pointer"
-          onClick={() => navigate('/subscribe')}
-        >
-            <div className="absolute inset-0 bg-gradient-to-r from-green-600 to-emerald-600 opacity-5 group-hover:opacity-10 transition-opacity pointer-events-none" />
-            <div className="relative z-10 flex items-center gap-4">
-                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-green-500 to-emerald-600 text-white flex items-center justify-center shadow-sm">
-                    <ShieldCheck size={20} />
-                </div>
-                <div className="text-left">
-                     <div className="flex items-center gap-2">
-                          <h3 className="text-sm font-bold text-gray-900 dark:text-white leading-none">
-                              Active Subscription
-                          </h3>
-                          <span className="text-[10px] font-bold bg-green-500/10 text-green-600 px-2 py-0.5 rounded-full border border-green-500/20 uppercase">
-                            {subscription.plan || 'Premium'}
-                          </span>
-                     </div>
-                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                        You already have an active subscription • Exp: {subscription.end_date ? new Date(subscription.end_date).toLocaleDateString() : 'N/A'}
-                     </p>
-                </div>
-            </div>
-            <div className="flex items-center gap-1 text-sm font-semibold text-green-600 dark:text-green-400 group-hover:translate-x-1 transition-transform">
-                Details <ChevronRight size={16} />
-            </div>
-        </motion.div>
-      ) : (
-        <motion.button 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          className="w-full relative overflow-hidden rounded-2xl border border-blue-200 dark:border-blue-500/30 bg-white/40 dark:bg-slate-800/40 backdrop-blur-xl shadow-lg transition-all hover:border-blue-400 dark:hover:border-blue-400 p-4 flex items-center justify-between group"
-          onClick={() => navigate('/subscribe')}
-        >
-            <div className="absolute inset-0 transition-opacity opacity-10 group-hover:opacity-20 pointer-events-none bg-gray-200 dark:bg-white/5" />
-            <div className="relative z-10 flex items-center gap-4">
-                <div className="w-10 h-10 rounded-lg flex items-center justify-center shadow-sm bg-gray-100 dark:bg-white/10 text-gray-500 dark:text-gray-400">
-                    <CreditCard size={20} />
-                </div>
-                <div className="text-left">
-                     <div className="flex items-center gap-2">
-                          <h3 className="text-sm font-bold text-gray-900 dark:text-white leading-none">
-                              Free Plan
-                          </h3>
-                          <span className="text-[10px] font-bold bg-gray-200 dark:bg-white/10 text-gray-500 px-2 py-0.5 rounded-full">FREE</span>
-                     </div>
-                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                        Upgrade to unlock features
-                     </p>
-                </div>
-            </div>
-            <div className="flex items-center gap-1 text-sm font-semibold text-blue-600 dark:text-blue-400 group-hover:translate-x-1 transition-transform">
-                Subscribe <ChevronRight size={16} />
-            </div>
-        </motion.button>
-      )}
-
       {/* Business Details Section */}
       <GlassCard className="p-6">
         <div className="flex items-center gap-3 mb-6">

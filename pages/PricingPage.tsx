@@ -2,13 +2,21 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import PublicNavbar from '../components/PublicNavbar';
-
+import { useAuth } from '../context/AuthContext';
 import { ScanzoLogo } from '../components/ScanzoLogo';
-
 import PublicFooter from '../components/PublicFooter';
 
 const PricingPage: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+
+  const handleGetStarted = () => {
+    if (user) {
+      navigate('/subscribe');
+    } else {
+      navigate('/dashboard');
+    }
+  };
 
   return (
     <div className="min-h-screen bg-white dark:bg-slate-900 font-sans text-slate-900 dark:text-white overflow-x-hidden">
@@ -33,7 +41,7 @@ const PricingPage: React.FC = () => {
               <div className="flex items-baseline gap-1 mb-8">
                 <span className="text-4xl font-bold">₹250</span>
               </div>
-              <button onClick={() => navigate('/dashboard')} className="mt-auto w-full py-3 rounded-xl border border-slate-200 dark:border-slate-700 font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+              <button onClick={handleGetStarted} className="mt-auto w-full py-3 rounded-xl border border-slate-200 dark:border-slate-700 font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
                 Get Started
               </button>
             </motion.div>
@@ -52,7 +60,7 @@ const PricingPage: React.FC = () => {
               <div className="flex items-baseline gap-1 mb-8">
                 <span className="text-4xl font-bold">₹1250</span>
               </div>
-              <button onClick={() => navigate('/dashboard')} className="mt-auto w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-lg shadow-blue-500/20 transition-colors">
+              <button onClick={handleGetStarted} className="mt-auto w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-lg shadow-blue-500/20 transition-colors">
                 Get Started
               </button>
             </motion.div>
@@ -68,7 +76,7 @@ const PricingPage: React.FC = () => {
               <div className="flex items-baseline gap-1 mb-8">
                 <span className="text-4xl font-bold">₹2250</span>
               </div>
-              <button onClick={() => navigate('/dashboard')} className="mt-auto w-full py-3 rounded-xl border border-slate-200 dark:border-slate-700 font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+              <button onClick={handleGetStarted} className="mt-auto w-full py-3 rounded-xl border border-slate-200 dark:border-slate-700 font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
                 Get Started
               </button>
             </motion.div>

@@ -102,11 +102,15 @@ CREATE TABLE public.reviews (
 CREATE TABLE public.subscriptions (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
     owner_id UUID REFERENCES public.owners(id) ON DELETE CASCADE NOT NULL,
+    razorpay_subscription_id TEXT,
+    plan_id TEXT,
+    status TEXT DEFAULT 'inactive',
+    current_period_end TIMESTAMP WITH TIME ZONE,
+    amount_paid NUMERIC DEFAULT 0,
     active BOOLEAN DEFAULT FALSE,
-    plan_name TEXT,
-    amount_paid NUMERIC,
-    end_date TIMESTAMP WITH TIME ZONE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()),
+    UNIQUE(owner_id)
 );
 
 -- 11. Enable Row Level Security (RLS)
@@ -199,30 +203,40 @@ CREATE POLICY "Owners can view their own subscriptions"
 ON public.subscriptions FOR SELECT 
 USING (auth.uid() = owner_id);
 
--- 9. Create Storage Buckets (Optional, for avatars)
--- Uncomment if you need storage setup
--- insert into storage.buckets (id, name) values ('avatars', 'avatars');
--- create policy "Avatar images are publicly accessible" on storage.objects for select using ( bucket_id = 'avatars' );
--- create policy "Anyone can upload an avatar" on storage.objects for insert with check ( bucket_id = 'avatars' );
+-- 9. Create Storage Buckets (For avatars/logos)
+INSERT INTO storage.buckets (id, name, public) VALUES ('avatars', 'avatars', true) ON CONFLICT (id) DO NOTHING;
+
+CREATE POLICY "Avatar images are publicly accessible" ON storage.objects FOR SELECT USING ( bucket_id = 'avatars' );
+CREATE POLICY "Anyone can upload an avatar" ON storage.objects FOR INSERT WITH CHECK ( bucket_id = 'avatars' );
+CREATE POLICY "Users can update their own avatar" ON storage.objects FOR UPDATE USING ( bucket_id = 'avatars' );
+CREATE POLICY "Users can delete their own avatar" ON storage.objects FOR DELETE USING ( bucket_id = 'avatars' );
 
 -- 10. Create 'private_reviews' table
-CREATE TABLE IF NOT EXISTS public.private_reviews (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    owner_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-    rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
+CREATE TABLE public.private_reviews (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    owner_id UUID REFERENCES public.owners(id) ON DELETE CASCADE NOT NULL,
+    customer_name TEXT,
+    rating INTEGER CHECK (rating >= 1 AND rating <= 5),
     feedback TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
 ALTER TABLE public.private_reviews ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Public can insert private reviews" 
-ON public.private_reviews FOR INSERT 
-WITH CHECK (true);
+CREATE POLICY "Public can insert private reviews" ON public.private_reviews FOR INSERT WITH CHECK (true);
+CREATE POLICY "Owners can view their own private reviews" ON public.private_reviews FOR SELECT USING (auth.uid() = owner_id);
 
-CREATE POLICY "Owners can view their own private reviews" 
-ON public.private_reviews FOR SELECT 
-USING (auth.uid() = owner_id);
-
-GRANT ALL ON public.private_reviews TO authenticated;
-GRANT INSERT ON public.private_reviews TO anon;
+-- 11. Create helper functions
+CREATE OR REPLACE FUNCTION public.is_subscription_active(p_owner_id uuid)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+    RETURN EXISTS (
+        SELECT 1 FROM public.businesses 
+        WHERE owner_id = p_owner_id 
+        AND subscription_status = 'active'
+    );
+END;
+$$;

@@ -7,7 +7,6 @@ import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { Review } from '../types';
 import { GoogleGenAI, Type } from '@google/genai';
-import Footer from '../components/Footer';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -24,11 +23,6 @@ const Dashboard: React.FC = () => {
   const [recentReviews, setRecentReviews] = useState<Review[]>([]);
   const [stats, setStats] = useState({ total: 0, avg: "0.0", positive: 0, negative: 0 });
   const [loading, setLoading] = useState(true);
-  const [analyzing, setAnalyzing] = useState(false);
-  const [aiAnalysis, setAiAnalysis] = useState<{
-    sentiment: string;
-    suggestions: string[];
-  } | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -72,88 +66,39 @@ const Dashboard: React.FC = () => {
             return;
         }
 
-        // 2. Fetch All Reviews for this user's businesses
-        // We fetch all to calculate accurate stats, similar to AiAssistant
-        const { data: reviews, error: reviewError } = await supabase
-            .from('reviews')
-            .select('*')
-            .in('business_id', businessIds)
-            .order('created_at', { ascending: false });
-        
-        if (reviewError) {
-            if (reviewError.message?.includes('Failed to fetch') && retryCount < 3) {
-                console.debug(`Retrying dashboard fetch (${retryCount + 1}/3)...`);
-                await new Promise(resolve => setTimeout(resolve, 1000));
-                return fetchDashboardData(retryCount + 1);
-            }
-            throw reviewError;
-        }
+        // 2. Fetch All Reviews (Public and Private)
+        const [reviewsRes, privateRes] = await Promise.all([
+            supabase.from('reviews').select('*').eq('owner_id', user.id).order('created_at', { ascending: false }),
+            supabase.from('private_reviews').select('*').eq('owner_id', user.id).order('created_at', { ascending: false })
+        ]);
 
-        if (reviews) {
+        if (reviewsRes.error) throw reviewsRes.error;
+        if (privateRes.error) throw privateRes.error;
+
+        // Combine and sort
+        const allReviews = [
+            ...(reviewsRes.data || []),
+            ...(privateRes.data || [])
+        ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+        if (allReviews) {
             // Set reviews for the list
-            setRecentReviews(reviews as any);
+            setRecentReviews(allReviews as any);
 
             // Calculate stats
-            const totalCount = reviews.length;
-            const totalSum = reviews.reduce((acc, curr) => acc + curr.rating, 0);
+            const totalCount = allReviews.length;
+            const totalSum = allReviews.reduce((acc, curr) => acc + curr.rating, 0);
             const avgRating = totalCount > 0 ? (totalSum / totalCount).toFixed(1) : "0.0";
-            const positive = reviews.filter(r => r.rating >= 4).length;
-            const negative = reviews.filter(r => r.rating <= 3).length;
+            const positive = allReviews.filter(r => r.rating >= 4).length;
+            const negative = allReviews.filter(r => r.rating <= 3).length;
             
             setStats({ total: totalCount, avg: avgRating, positive, negative });
-
-            // Trigger AI Analysis if we have reviews
-            if (totalCount > 0) {
-                analyzeReviews(reviews);
-            }
         }
 
     } catch (err) {
         console.error("Error loading dashboard:", err);
     } finally {
         setLoading(false);
-    }
-  };
-
-  const analyzeReviews = async (allReviews: any[]) => {
-    if (allReviews.length === 0) return;
-    setAnalyzing(true);
-    try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-      const reviewsText = allReviews.slice(0, 10).map(r => `Rating: ${r.rating}, Feedback: ${r.feedback || r.comment || 'No text'}`).join('\n');
-      
-      const prompt = `Analyze these customer reviews and provide:
-      1. Overall Sentiment (1 sentence)
-      2. Top 2 Action Suggestions for the business.
-      
-      Reviews:
-      ${reviewsText}
-      
-      Return JSON: {"sentiment": "string", "suggestions": ["string", "string"]}`;
-
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: prompt,
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              sentiment: { type: Type.STRING },
-              suggestions: { type: Type.ARRAY, items: { type: Type.STRING } }
-            },
-            required: ["sentiment", "suggestions"]
-          }
-        }
-      });
-
-      if (response.text) {
-        setAiAnalysis(JSON.parse(response.text));
-      }
-    } catch (error) {
-      console.error("AI Analysis error on dashboard:", error);
-    } finally {
-      setAnalyzing(false);
     }
   };
 
@@ -345,45 +290,10 @@ const Dashboard: React.FC = () => {
                  </div>
               </div>
            </GlassCard>
-
-           {/* AI Insights Summary */}
-           <GlassCard delay={0.7} className="p-5">
-              <div className="flex items-center gap-2 mb-4">
-                 <Zap size={18} className="text-blue-500" />
-                 <h3 className="font-bold text-gray-900 dark:text-white">AI Coach Insights</h3>
-              </div>
-              
-              {analyzing ? (
-                 <div className="space-y-3 animate-pulse">
-                    <div className="h-4 bg-gray-100 dark:bg-white/5 rounded w-full"></div>
-                    <div className="h-4 bg-gray-100 dark:bg-white/5 rounded w-3/4"></div>
-                 </div>
-              ) : aiAnalysis ? (
-                 <div className="space-y-4">
-                    <p className="text-sm text-gray-600 dark:text-gray-300 italic">
-                       "{aiAnalysis.sentiment}"
-                    </p>
-                    <div className="space-y-2">
-                       {aiAnalysis.suggestions.map((s, i) => (
-                          <div key={i} className="flex items-start gap-2 text-xs text-gray-500 dark:text-gray-400">
-                             <div className="mt-1 w-1 h-1 rounded-full bg-blue-500 shrink-0" />
-                             {s}
-                          </div>
-                       ))}
-                    </div>
-                    <Link to="/ai-assistant" className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1">
-                       View full analysis <ArrowRight size={12} />
-                    </Link>
-                 </div>
-              ) : (
-                 <p className="text-xs text-gray-400">Collect more reviews to get AI coaching insights.</p>
-              )}
-           </GlassCard>
         </div>
       </div>
 
       {/* Footer */}
-      <Footer />
     </motion.div>
   );
 };

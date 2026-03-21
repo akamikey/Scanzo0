@@ -11,8 +11,8 @@ const PLANS = [
     id: 'monthly',
     name: 'Monthly Plan',
     price: 250,
-    planId: 'plan_SBmRucECQ7R5dJ',
-    features: ['Unlimited QR Scans', 'Google Redirect', 'Basic Analytics', 'Email Support'],
+    planId: 'plan_STxKdWOYODRHqL',
+    savings: '',
     color: 'from-blue-500 to-cyan-500',
     popular: false,
   },
@@ -20,8 +20,8 @@ const PLANS = [
     id: 'biannual',
     name: '6 Months Plan',
     price: 1250,
-    planId: 'plan_SBmc0r5xUg65iM',
-    features: ['Everything for 6 months', 'Priority Support', 'Advanced Analytics', 'Save ₹250'],
+    planId: 'plan_STxMY7FBbIvQcJ',
+    savings: 'Save ₹250',
     color: 'from-purple-500 to-pink-500',
     popular: true,
   },
@@ -29,8 +29,8 @@ const PLANS = [
     id: 'annual',
     name: 'Yearly Plan',
     price: 2250,
-    planId: 'plan_SM3t9nNkfUECGe',
-    features: ['Everything for 1 year', 'Dedicated Manager', 'Custom QR Designs', 'Save ₹750'],
+    planId: 'plan_STxNeYFeyNGw6J',
+    savings: 'Save ₹750',
     color: 'from-orange-500 to-red-500',
     popular: false,
   },
@@ -383,14 +383,18 @@ const SubscribePage: React.FC = () => {
                     </div>
                     
                     <div className="mt-8 space-y-4">
-                      {plan.features.map((feature, i) => (
-                          <div key={i} className="flex items-start gap-3">
-                              <div className={`mt-1 p-0.5 rounded-full ${isSuccess ? 'bg-green-500' : 'bg-blue-500'} text-white shrink-0`}>
-                                  <Check size={12} strokeWidth={3} />
-                              </div>
-                              <span className="text-sm text-gray-600 dark:text-gray-300">{feature}</span>
+                      {plan.savings && (
+                          <div className="flex items-center gap-3 p-3 rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-100 dark:border-green-500/20">
+                              <Sparkles className="text-green-600 dark:text-green-400" size={18} />
+                              <span className="text-sm font-bold text-green-700 dark:text-green-300">{plan.savings}</span>
                           </div>
-                      ))}
+                      )}
+                      <div className="flex items-start gap-3">
+                          <div className={`mt-1 p-0.5 rounded-full ${isSuccess ? 'bg-green-500' : 'bg-blue-500'} text-white shrink-0`}>
+                              <Check size={12} strokeWidth={3} />
+                          </div>
+                          <span className="text-sm text-gray-600 dark:text-gray-300">Full Premium Access</span>
+                      </div>
                     </div>
                   </div>
 
@@ -447,7 +451,6 @@ const SubscribePage: React.FC = () => {
       </div>
 
       {/* Footer */}
-      <Footer />
     </div>
   );
 };

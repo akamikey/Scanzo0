@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { Star, Globe, Loader2, CheckCircle2 } from 'lucide-react';
+import { Star, Globe, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const SuccessOverlay: React.FC<{ rating: number, reviewLink?: string, isFeedback?: boolean }> = ({ rating, reviewLink, isFeedback }) => {
@@ -95,52 +95,88 @@ const PublicReviewPage: React.FC = () => {
   const [ownerId, setOwnerId] = useState<string | null>(null);
   const [businessId, setBusinessId] = useState<string | null>(null);
 
+  const [isExpired, setIsExpired] = useState(false);
+
   useEffect(() => {
-    const fetchLinks = async () => {
-      if (!slug) {
-        setLoading(false);
-        return;
-      }
-      
-      try {
-        const { data: owner, error: ownerError } = await supabase
-          .from('owners')
-          .select('id, business_name')
-          .eq('public_slug', slug)
-          .maybeSingle();
+    let subscriptionChannel: any = null;
 
-        if (ownerError) throw ownerError;
-
-        if (owner) {
-          setBusinessName(owner.business_name);
-          setOwnerId(owner.id);
-          
-          const { data: linkData, error: linkError } = await supabase
-            .from('businesses')
-            .select('id, review_link, website_link')
-            .eq('owner_id', owner.id)
-            .maybeSingle();
-            
-          if (linkError) throw linkError;
-
-          if (linkData) {
-            setLinks(linkData);
-            setBusinessId(linkData.id);
-          }
-        } else {
-          console.warn("No owner found for slug:", slug);
+    if (slug) {
+      fetchLinks().then(() => {
+        if (ownerId) {
+          subscriptionChannel = supabase
+            .channel(`review-public-${ownerId}`)
+            .on(
+              'postgres_changes',
+              {
+                event: 'UPDATE',
+                schema: 'public',
+                table: 'businesses',
+                filter: `owner_id=eq.${ownerId}`
+              },
+              (payload) => {
+                const newStatus = payload.new.subscription_status;
+                setIsExpired(newStatus !== 'active');
+              }
+            )
+            .subscribe();
         }
-      } catch (err) {
-        console.error("Error fetching public review links:", err);
-      } finally {
-        setLoading(false);
+      });
+    }
+
+    return () => {
+      if (subscriptionChannel) {
+        supabase.removeChannel(subscriptionChannel);
       }
     };
+  }, [slug, ownerId]);
+
+  const fetchLinks = async () => {
+    if (!slug) {
+      setLoading(false);
+      return;
+    }
     
-    fetchLinks();
-  }, [slug]);
+    try {
+      const { data: owner, error: ownerError } = await supabase
+        .from('owners')
+        .select('id, business_name')
+        .eq('public_slug', slug)
+        .maybeSingle();
+
+      if (ownerError) throw ownerError;
+
+      if (owner) {
+        setBusinessName(owner.business_name);
+        setOwnerId(owner.id);
+        
+        const { data: bizData, error: linkError } = await supabase
+          .from('businesses')
+          .select('id, review_link, website_link, subscription_status')
+          .eq('owner_id', owner.id)
+          .maybeSingle();
+          
+        if (linkError) throw linkError;
+
+        if (bizData) {
+          setLinks(bizData);
+          setBusinessId(bizData.id);
+          setIsExpired(bizData.subscription_status !== 'active');
+        }
+      } else {
+        console.warn("No owner found for slug:", slug);
+      }
+    } catch (err) {
+      console.error("Error fetching public review links:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleRatingSelect = (selectedRating: number) => {
+    if (isExpired) {
+      alert("This business is currently inactive.");
+      return;
+    }
     setRating(selectedRating);
     // Always show feedback form first, even for 4-5 stars
     setStep('feedback');
@@ -148,6 +184,10 @@ const PublicReviewPage: React.FC = () => {
 
   const handleSubmitFeedback = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isExpired) {
+      alert("This business is currently inactive.");
+      return;
+    }
     if (!businessId) {
       alert("Error: Business information missing. Please try again later.");
       return;
@@ -155,14 +195,16 @@ const PublicReviewPage: React.FC = () => {
 
     setSubmitting(true);
     try {
+      const targetTable = rating >= 4 ? 'reviews' : 'private_reviews';
+      
       const { error } = await supabase
-        .from('reviews')
+        .from(targetTable)
         .insert([
           {
-            business_id: businessId,
+            owner_id: ownerId,
             rating: rating,
-            name: customerName,
-            feedback: comment,
+            customer_name: customerName || 'Customer',
+            [targetTable === 'reviews' ? 'comment' : 'feedback']: comment,
             created_at: new Date().toISOString()
           }
         ]);
@@ -184,6 +226,24 @@ const PublicReviewPage: React.FC = () => {
           <Loader2 className="animate-spin text-blue-500 w-12 h-12 mx-auto mb-4" />
           <p className="text-slate-500 font-medium">Loading review page...</p>
         </div>
+      </div>
+    );
+  }
+
+  if (isExpired) {
+    return (
+      <div className="min-h-screen bg-[#F2F2F7] flex flex-col items-center justify-center p-6 text-center">
+        <div className="w-20 h-20 bg-amber-100 text-amber-500 rounded-full flex items-center justify-center mb-6">
+          <AlertCircle size={40} />
+        </div>
+        <h1 className="text-2xl font-bold text-slate-800 mb-2">Business Inactive</h1>
+        <p className="text-slate-500 max-w-xs mb-8">This business is currently inactive. Reviews are temporarily disabled.</p>
+        <button 
+          onClick={() => window.location.href = '/'}
+          className="px-8 py-3 bg-blue-600 text-white rounded-xl font-bold"
+        >
+          Go Back
+        </button>
       </div>
     );
   }

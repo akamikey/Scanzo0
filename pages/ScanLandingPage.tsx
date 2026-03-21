@@ -16,6 +16,8 @@ export default function ScanLandingPage() {
   const navigate = useNavigate();
 
   useEffect(() => {
+    let subscriptionChannel: any = null;
+
     const fetchBusinessData = async () => {
       if (!slug) {
         setError("Invalid QR Code");
@@ -45,7 +47,6 @@ export default function ScanLandingPage() {
           supabase.from('business_pages').select('logo_url').eq('owner_id', owner.id).maybeSingle(),
           supabase.from('businesses').select('review_link, website_link').eq('owner_id', owner.id).maybeSingle()
         ]);
-        const subActive = true;
 
         if (pageRes.data?.logo_url) setLogoUrl(pageRes.data.logo_url);
         if (linksRes.data) {
@@ -53,11 +54,38 @@ export default function ScanLandingPage() {
           setWebsiteLink(linksRes.data.website_link);
         }
 
-        if (!subActive) {
-          setIsExpired(true);
-          setLoading(false);
-          return;
-        }
+        // 3. Initial Subscription Check
+        const checkSubscription = async () => {
+          const { data: biz } = await supabase
+            .from('businesses')
+            .select('subscription_status')
+            .eq('owner_id', owner.id)
+            .maybeSingle();
+
+          const isSubActive = biz?.subscription_status === 'active';
+          setIsExpired(!isSubActive);
+        };
+
+        await checkSubscription();
+
+        // 4. Real-time Subscription Updates
+        subscriptionChannel = supabase
+          .channel(`business-${owner.id}`)
+          .on(
+            'postgres_changes',
+            {
+              event: 'UPDATE',
+              schema: 'public',
+              table: 'businesses',
+              filter: `owner_id=eq.${owner.id}`
+            },
+            (payload) => {
+              const newStatus = payload.new.subscription_status;
+              setIsExpired(newStatus !== 'active');
+            }
+          )
+          .subscribe();
+
       } catch (err) {
         console.error("Error fetching business data:", err);
         setError("Something went wrong");
@@ -67,6 +95,12 @@ export default function ScanLandingPage() {
     };
 
     fetchBusinessData();
+
+    return () => {
+      if (subscriptionChannel) {
+        supabase.removeChannel(subscriptionChannel);
+      }
+    };
   }, [slug]);
 
   const handleRedirect = (url: string | null) => {
@@ -106,12 +140,23 @@ export default function ScanLandingPage() {
     );
   }
 
-  // Subscription lock UI removed for now
-  /*
   if (isExpired) {
-    ...
+    return (
+      <div className="min-h-[100dvh] bg-[#F2F2F7] flex flex-col items-center justify-center p-6 text-center">
+        <div className="w-20 h-20 bg-amber-100 text-amber-500 rounded-full flex items-center justify-center mb-6">
+          <AlertCircle size={40} />
+        </div>
+        <h1 className="text-2xl font-bold text-slate-800 mb-2">Business Inactive</h1>
+        <p className="text-slate-500 max-w-xs mx-auto">This business is currently inactive. Please contact the owner.</p>
+        <button 
+          onClick={() => navigate('/')}
+          className="px-8 py-3 bg-blue-600 text-white rounded-xl font-bold mt-8"
+        >
+          Go Back
+        </button>
+      </div>
+    );
   }
-  */
 
   return (
     <div className="min-h-[100dvh] bg-[#F2F2F7] flex flex-col items-center justify-center p-6 relative overflow-hidden font-sans">

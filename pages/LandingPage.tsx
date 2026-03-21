@@ -3,12 +3,30 @@ import { motion } from 'framer-motion';
 import { useNavigate, Link } from 'react-router-dom';
 import PublicNavbar from '../components/PublicNavbar';
 import { ScanzoLogo } from '../components/ScanzoLogo';
+import { useAuth } from '../context/AuthContext';
 import { Star, ArrowRight, CheckCircle2, QrCode, Globe, Layout, MessageSquare } from 'lucide-react';
 
 import PublicFooter from '../components/PublicFooter';
 
 const LandingPage: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+
+  const handleGetStarted = () => {
+    if (user) {
+      navigate('/dashboard');
+    } else {
+      navigate('/dashboard'); // AuthModal will show up
+    }
+  };
+
+  const handleChoosePlan = () => {
+    if (user) {
+      navigate('/subscribe');
+    } else {
+      navigate('/dashboard');
+    }
+  };
 
   return (
     <div className="min-h-screen bg-white dark:bg-slate-950 font-sans text-slate-900 dark:text-white overflow-x-hidden flex flex-col">
@@ -48,7 +66,7 @@ const LandingPage: React.FC = () => {
               <motion.button 
                 whileHover={{ scale: 1.02, y: -2 }}
                 whileTap={{ scale: 0.98 }}
-                onClick={() => navigate('/dashboard')} 
+                onClick={handleGetStarted} 
                 className="w-full sm:w-auto px-10 py-5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl font-bold text-lg shadow-2xl shadow-blue-500/10 flex items-center justify-center gap-2 group transition-all"
               >
                 Start Growing Now
@@ -162,9 +180,9 @@ const LandingPage: React.FC = () => {
 
         <div className="grid md:grid-cols-3 gap-10 max-w-6xl mx-auto">
           {[
-            { name: 'Monthly', price: '₹250', delay: 0.1, features: ['Smart QR Code', 'Review Collection', 'Basic Insights'] },
-            { name: '6 Months', price: '₹1250', popular: true, delay: 0.2, features: ['Everything in Monthly', 'Priority Support', 'Advanced Analytics', 'Custom Branding'] },
-            { name: 'Yearly', price: '₹2250', delay: 0.3, features: ['Everything in 6 Months', '2 Months Free', 'Dedicated Account Manager', 'Early Access Features'] },
+            { name: 'Monthly', price: '₹250', delay: 0.1, savings: '' },
+            { name: '6 Months', price: '₹1250', popular: true, delay: 0.2, savings: 'Save ₹250' },
+            { name: 'Yearly', price: '₹2250', delay: 0.3, savings: 'Save ₹750' },
           ].map((plan) => (
             <motion.div 
               key={plan.name}
@@ -180,24 +198,26 @@ const LandingPage: React.FC = () => {
                 </div>
               )}
               <h3 className={`text-xl font-black mb-4 ${plan.popular ? 'text-blue-600' : 'text-slate-500'}`}>{plan.name}</h3>
-              <div className="flex items-baseline gap-2 mb-10">
+              <div className="flex items-baseline gap-2 mb-6">
                 <span className="text-5xl font-black text-slate-900 dark:text-white">{plan.price}</span>
                 <span className="text-slate-500 font-medium">/period</span>
               </div>
               
-              <ul className="space-y-4 mb-10">
-                {plan.features.map(feature => (
-                  <li key={feature} className="flex items-center gap-3 text-slate-600 dark:text-slate-400 font-medium">
-                    <CheckCircle2 className="w-5 h-5 text-blue-500 flex-shrink-0" />
-                    {feature}
-                  </li>
-                ))}
-              </ul>
+              {plan.savings && (
+                <p className="text-emerald-600 dark:text-emerald-400 font-bold mb-6 flex items-center gap-2">
+                  <CheckCircle2 className="w-5 h-5" />
+                  {plan.savings}
+                </p>
+              )}
+
+              <div className="mb-10">
+                <p className="text-slate-600 dark:text-slate-400 font-medium">Full Premium Access</p>
+              </div>
 
               <motion.button 
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
-                onClick={() => navigate('/dashboard')} 
+                onClick={handleChoosePlan} 
                 className={`mt-auto w-full py-5 rounded-2xl font-black transition-all text-lg ${plan.popular ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-xl shadow-blue-500/20' : 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white hover:bg-slate-200 dark:hover:bg-slate-700'}`}
               >
                 Choose {plan.name}

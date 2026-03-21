@@ -384,7 +384,6 @@ const GoogleLinkPage: React.FC = () => {
       </div>
 
       {/* Footer */}
-      <Footer />
     </div>
   );
 };

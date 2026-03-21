@@ -283,13 +283,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         try {
             // 1. Get Session with retry logic
-            // We don't use a strict timeout promise here anymore, 
-            // instead we let it run and check if we're already resolved by onAuthStateChange
             const result = await retryAuthCall(() => supabase.auth.getSession(), 3, 500, true);
             const error = result.error;
             const session = result.data?.session;
             
-            if (error) throw error;
+            if (error) {
+                const msg = error.message || String(error);
+                if (msg.includes("Refresh Token Not Found") || msg.includes("Invalid Refresh Token")) {
+                    console.warn("Stale refresh token detected, clearing session");
+                    await supabase.auth.signOut();
+                    if (mounted) {
+                        setSession(null);
+                        setUser(null);
+                        setOwnerData(null);
+                        setSubscription(null);
+                    }
+                    return;
+                }
+                throw error;
+            }
             
             if (mounted) {
                 authResolved = true;
@@ -310,6 +322,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 // If onAuthStateChange already gave us a user (authResolved is true), don't treat this as a fatal error
                 if (authResolved) {
                     console.warn("getSession failed but auth was already resolved:", error);
+                } else if (msg.includes("Refresh Token Not Found") || msg.includes("Invalid Refresh Token")) {
+                    console.warn("Stale session detected during initialization:", msg);
+                    supabase.auth.signOut().catch(() => {});
+                    setSession(null);
+                    setUser(null);
+                    setOwnerData(null);
+                    setSubscription(null);
                 } else if (msg.includes("Lock broken") || msg.includes("lock")) {
                     // Lock errors are common in React Strict Mode due to concurrent getSession/onAuthStateChange
                     console.warn("Auth initialization warning (lock contention):", msg);

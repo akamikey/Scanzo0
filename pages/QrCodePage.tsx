@@ -403,7 +403,6 @@ const QrCodePage: React.FC = () => {
         </p>
       </GlassCard>
       {/* Footer */}
-      <Footer />
     </div>
   );
 };

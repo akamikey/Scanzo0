@@ -6,7 +6,6 @@ import { useNavigate } from 'react-router-dom';
 import GlassCard from '../components/GlassCard';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
-import Footer from '../components/Footer';
 
 interface ChartData {
   name: string;
@@ -165,7 +164,6 @@ const Insights: React.FC = () => {
         </div>
 
         {/* Footer */}
-        <Footer />
       </motion.div>
   );
 };

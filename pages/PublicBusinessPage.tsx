@@ -65,10 +65,38 @@ const PublicBusinessPage: React.FC = () => {
   const [links, setLinks] = useState<any>(null);
 
   useEffect(() => {
+    let subscriptionChannel: any = null;
+
     if (slug) {
-      fetchData();
+      fetchData().then(() => {
+        // Set up real-time listener after initial fetch
+        if (page?.owner_id) {
+          subscriptionChannel = supabase
+            .channel(`business-public-${page.owner_id}`)
+            .on(
+              'postgres_changes',
+              {
+                event: 'UPDATE',
+                schema: 'public',
+                table: 'businesses',
+                filter: `owner_id=eq.${page.owner_id}`
+              },
+              (payload) => {
+                const newStatus = payload.new.subscription_status;
+                setIsExpired(newStatus !== 'active');
+              }
+            )
+            .subscribe();
+        }
+      });
     }
-  }, [slug]);
+
+    return () => {
+      if (subscriptionChannel) {
+        supabase.removeChannel(subscriptionChannel);
+      }
+    };
+  }, [slug, page?.owner_id]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -89,16 +117,9 @@ const PublicBusinessPage: React.FC = () => {
       setPage(pageData);
 
       // 2. Check Subscription
-      const { data: isSubActive } = await supabase.rpc('is_subscription_active', { p_owner_id: pageData.owner_id });
-
-      if (!isSubActive) {
-        setIsExpired(true);
-      }
-
-      // Fetch Links from businesses table
       const { data: bizData } = await supabase
         .from('businesses')
-        .select('review_link, website_link')
+        .select('review_link, website_link, subscription_status')
         .eq('owner_id', pageData.owner_id)
         .maybeSingle();
 
@@ -107,6 +128,7 @@ const PublicBusinessPage: React.FC = () => {
           website_link: bizData.website_link,
           google_link: bizData.review_link
         });
+        setIsExpired(bizData.subscription_status !== 'active');
       }
 
       // 3. Fetch Services (Try-catch for optional tables)
@@ -166,12 +188,23 @@ const PublicBusinessPage: React.FC = () => {
     );
   }
 
-  // Subscription lock UI removed for now
-  /*
   if (isExpired) {
-    ...
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-black p-6 text-center">
+        <div className="w-20 h-20 bg-amber-100 dark:bg-amber-900/20 text-amber-500 rounded-full flex items-center justify-center mb-6">
+          <AlertCircle size={40} />
+        </div>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Business Inactive</h1>
+        <p className="text-gray-500 max-w-xs">This business is currently inactive. Please contact the owner for more information.</p>
+        <button 
+          onClick={() => window.location.href = '/'}
+          className="px-8 py-3 bg-blue-600 text-white rounded-xl font-bold mt-8"
+        >
+          Go Back
+        </button>
+      </div>
+    );
   }
-  */
 
   const themeColor = page.theme_color || '#3b82f6';
 

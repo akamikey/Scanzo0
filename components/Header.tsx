@@ -162,6 +162,18 @@ const Header: React.FC<HeaderProps> = ({ isDark, toggleTheme, toggleSidebar }) =
   };
 
   const displayAvatar = localAvatar || ownerData?.avatar_url || `https://ui-avatars.com/api/?name=${user?.email || 'User'}&background=random`;
+  
+  // Calculate remaining days
+  const getRemainingDays = () => {
+    if (!subscription?.isActive || !subscription?.end_date) return null;
+    const end = new Date(subscription.end_date);
+    const now = new Date();
+    const diffTime = end.getTime() - now.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays > 0 ? diffDays : 0;
+  };
+
+  const remainingDays = getRemainingDays();
 
   // Determine Plan Name logic
   const planDisplay = subscription?.isActive 
@@ -207,9 +219,16 @@ const Header: React.FC<HeaderProps> = ({ isDark, toggleTheme, toggleSidebar }) =
             <span className="text-sm font-semibold text-gray-800 dark:text-gray-100">
                 {user?.email || 'My Account'}
             </span>
-            <span className="text-xs text-gray-500 dark:text-gray-400">
-                {planDisplay}
-            </span>
+            <div className="flex items-center gap-2">
+                {remainingDays !== null && (
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/20">
+                        {remainingDays} days left
+                    </span>
+                )}
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                    {planDisplay}
+                </span>
+            </div>
           </div>
 
           <button
