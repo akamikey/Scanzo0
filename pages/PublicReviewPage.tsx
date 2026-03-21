@@ -197,17 +197,24 @@ const PublicReviewPage: React.FC = () => {
     try {
       const targetTable = rating >= 4 ? 'reviews' : 'private_reviews';
       
+      const insertData: any = {
+        business_id: businessId,
+        rating: rating,
+        feedback: comment,
+        created_at: new Date().toISOString()
+      };
+
+      // Only add name if it's the public reviews table (private_reviews doesn't have it)
+      if (targetTable === 'reviews') {
+        insertData.name = customerName || 'Customer';
+      } else {
+        // For private reviews, prepend name to feedback
+        insertData.feedback = `From: ${customerName || 'Anonymous'}\n\n${comment}`;
+      }
+
       const { error } = await supabase
         .from(targetTable)
-        .insert([
-          {
-            owner_id: ownerId,
-            rating: rating,
-            customer_name: customerName || 'Customer',
-            [targetTable === 'reviews' ? 'comment' : 'feedback']: comment,
-            created_at: new Date().toISOString()
-          }
-        ]);
+        .insert([insertData]);
 
       if (error) throw error;
       setStep('success');
@@ -226,24 +233,6 @@ const PublicReviewPage: React.FC = () => {
           <Loader2 className="animate-spin text-blue-500 w-12 h-12 mx-auto mb-4" />
           <p className="text-slate-500 font-medium">Loading review page...</p>
         </div>
-      </div>
-    );
-  }
-
-  if (isExpired) {
-    return (
-      <div className="min-h-screen bg-[#F2F2F7] flex flex-col items-center justify-center p-6 text-center">
-        <div className="w-20 h-20 bg-amber-100 text-amber-500 rounded-full flex items-center justify-center mb-6">
-          <AlertCircle size={40} />
-        </div>
-        <h1 className="text-2xl font-bold text-slate-800 mb-2">Business Inactive</h1>
-        <p className="text-slate-500 max-w-xs mb-8">This business is currently inactive. Reviews are temporarily disabled.</p>
-        <button 
-          onClick={() => window.location.href = '/'}
-          className="px-8 py-3 bg-blue-600 text-white rounded-xl font-bold"
-        >
-          Go Back
-        </button>
       </div>
     );
   }
@@ -268,6 +257,14 @@ const PublicReviewPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#F2F2F7] flex flex-col items-center justify-center p-6 font-sans">
+      {/* Inactive Banner */}
+      {isExpired && (
+        <div className="fixed top-0 left-0 right-0 bg-amber-500 text-white py-3 px-6 text-center font-bold z-[100] shadow-lg flex items-center justify-center gap-2 text-sm">
+          <AlertCircle size={18} />
+          <span>Business Inactive - Reviews Temporarily Disabled</span>
+        </div>
+      )}
+      
       <AnimatePresence>
         {step === 'success' && (
           <SuccessOverlay 
@@ -278,90 +275,108 @@ const PublicReviewPage: React.FC = () => {
         )}
       </AnimatePresence>
 
-      <div className="w-full max-w-md bg-white rounded-[2.5rem] shadow-2xl shadow-blue-500/10 p-8 md:p-10 border border-white/40 backdrop-blur-sm">
+      <div className={`w-full max-w-md bg-white rounded-[2.5rem] shadow-2xl shadow-blue-500/10 p-8 md:p-10 border border-white/40 backdrop-blur-sm ${isExpired ? 'opacity-75 pointer-events-none grayscale' : ''}`}>
         <div className="text-center mb-10">
           <h1 className="text-2xl font-black text-slate-800 tracking-tight mb-2">{businessName}</h1>
           <div className="h-1 w-12 bg-blue-500 mx-auto rounded-full" />
         </div>
 
-        {step === 'rating' && (
-          <div className="space-y-8 text-center">
-            <h2 className="text-xl font-bold text-slate-700">How was your experience?</h2>
-            <div className="flex justify-center gap-2">
-              {[1, 2, 3, 4, 5].map((star) => (
-                <motion.button
-                  whileTap={{ scale: 0.8 }}
-                  key={star}
-                  type="button"
-                  onClick={() => handleRatingSelect(star)}
-                  onMouseEnter={() => setHover(star)}
-                  onMouseLeave={() => setHover(0)}
-                  className="transition-all"
-                >
-                  <Star
-                    size={48}
-                    className={`${
-                      star <= (hover || rating) ? 'text-amber-400 fill-amber-400' : 'text-slate-200'
-                    } transition-colors duration-200`}
-                  />
-                </motion.button>
-              ))}
+        {isExpired ? (
+          <div className="text-center space-y-4 py-8">
+            <div className="w-16 h-16 bg-amber-100 text-amber-500 rounded-full flex items-center justify-center mx-auto">
+              <AlertCircle size={32} />
             </div>
-            <p className="text-slate-400 text-sm font-medium">Tap a star to rate us</p>
-          </div>
-        )}
-
-        {step === 'feedback' && (
-          <form onSubmit={handleSubmitFeedback} className="space-y-6">
-            <div className="text-center mb-6">
-              <h2 className="text-xl font-bold text-slate-700 mb-2">
-                {rating >= 4 ? "We're glad you enjoyed it!" : "We'd love to hear more"}
-              </h2>
-              <p className="text-slate-500 text-sm">
-                {rating >= 4 
-                  ? "Share a quick note about your experience." 
-                  : "Your feedback helps us improve our service."}
-              </p>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">Your Name</label>
-                <input
-                  type="text"
-                  value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
-                  placeholder="Optional"
-                  className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 transition-all text-slate-700 font-medium"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">
-                  {rating >= 4 ? "Your Message (Optional)" : "Your Feedback"}
-                </label>
-                <textarea
-                  required={rating < 4}
-                  value={comment}
-                  onChange={(e) => setComment(e.target.value)}
-                  placeholder={rating >= 4 
-                    ? "Write a short message about your experience (optional)" 
-                    : "Tell us what went wrong so we can improve."}
-                  rows={4}
-                  className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 transition-all text-slate-700 font-medium resize-none"
-                />
-              </div>
-            </div>
-
-            <motion.button
-              whileTap={{ scale: 0.95 }}
-              type="submit"
-              disabled={submitting}
-              className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-bold shadow-lg shadow-blue-500/20 transition-all flex items-center justify-center gap-2 disabled:opacity-70"
+            <h2 className="text-xl font-bold text-slate-700">Reviews Disabled</h2>
+            <p className="text-slate-500">This business is currently inactive. Please check back later.</p>
+            <button 
+              onClick={() => window.location.href = `/#/b/${slug}`}
+              className="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold mt-4 pointer-events-auto"
             >
-              {submitting ? <Loader2 className="animate-spin" size={20} /> : (rating >= 4 ? 'Submit & Continue' : 'Submit Feedback')}
-            </motion.button>
-          </form>
+              View Business Profile
+            </button>
+          </div>
+        ) : (
+          <>
+            {step === 'rating' && (
+              <div className="space-y-8 text-center">
+                <h2 className="text-xl font-bold text-slate-700">How was your experience?</h2>
+                <div className="flex justify-center gap-2">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <motion.button
+                      whileTap={{ scale: 0.8 }}
+                      key={star}
+                      type="button"
+                      onClick={() => handleRatingSelect(star)}
+                      onMouseEnter={() => setHover(star)}
+                      onMouseLeave={() => setHover(0)}
+                      className="transition-all"
+                    >
+                      <Star
+                        size={48}
+                        className={`${
+                          star <= (hover || rating) ? 'text-amber-400 fill-amber-400' : 'text-slate-200'
+                        } transition-colors duration-200`}
+                      />
+                    </motion.button>
+                  ))}
+                </div>
+                <p className="text-slate-400 text-sm font-medium">Tap a star to rate us</p>
+              </div>
+            )}
+
+            {step === 'feedback' && (
+              <form onSubmit={handleSubmitFeedback} className="space-y-6">
+                <div className="text-center mb-6">
+                  <h2 className="text-xl font-bold text-slate-700 mb-2">
+                    {rating >= 4 ? "We're glad you enjoyed it!" : "We'd love to hear more"}
+                  </h2>
+                  <p className="text-slate-500 text-sm">
+                    {rating >= 4 
+                      ? "Share a quick note about your experience." 
+                      : "Your feedback helps us improve our service."}
+                  </p>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">Your Name</label>
+                    <input
+                      type="text"
+                      value={customerName}
+                      onChange={(e) => setCustomerName(e.target.value)}
+                      placeholder="Optional"
+                      className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 transition-all text-slate-700 font-medium"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">
+                      {rating >= 4 ? "Your Message (Optional)" : "Your Feedback"}
+                    </label>
+                    <textarea
+                      required={rating < 4}
+                      value={comment}
+                      onChange={(e) => setComment(e.target.value)}
+                      placeholder={rating >= 4 
+                        ? "Write a short message about your experience (optional)" 
+                        : "Tell us what went wrong so we can improve."}
+                      rows={4}
+                      className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 transition-all text-slate-700 font-medium resize-none"
+                    />
+                  </div>
+                </div>
+
+                <motion.button
+                  whileTap={{ scale: 0.95 }}
+                  type="submit"
+                  disabled={submitting}
+                  className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-bold shadow-lg shadow-blue-500/20 transition-all flex items-center justify-center gap-2 disabled:opacity-70"
+                >
+                  {submitting ? <Loader2 className="animate-spin" size={20} /> : (rating >= 4 ? 'Submit & Continue' : 'Submit Feedback')}
+                </motion.button>
+              </form>
+            )}
+          </>
         )}
       </div>
 

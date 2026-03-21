@@ -140,26 +140,16 @@ export default function ScanLandingPage() {
     );
   }
 
-  if (isExpired) {
-    return (
-      <div className="min-h-[100dvh] bg-[#F2F2F7] flex flex-col items-center justify-center p-6 text-center">
-        <div className="w-20 h-20 bg-amber-100 text-amber-500 rounded-full flex items-center justify-center mb-6">
-          <AlertCircle size={40} />
-        </div>
-        <h1 className="text-2xl font-bold text-slate-800 mb-2">Business Inactive</h1>
-        <p className="text-slate-500 max-w-xs mx-auto">This business is currently inactive. Please contact the owner.</p>
-        <button 
-          onClick={() => navigate('/')}
-          className="px-8 py-3 bg-blue-600 text-white rounded-xl font-bold mt-8"
-        >
-          Go Back
-        </button>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-[100dvh] bg-[#F2F2F7] flex flex-col items-center justify-center p-6 relative overflow-hidden font-sans">
+      {/* Inactive Banner */}
+      {isExpired && (
+        <div className="fixed top-0 left-0 right-0 bg-amber-500 text-white py-3 px-6 text-center font-bold z-[100] shadow-lg flex items-center justify-center gap-2 text-sm">
+          <AlertCircle size={18} />
+          <span>Business Inactive - Explore & Reviews Disabled</span>
+        </div>
+      )}
+      
       {/* Premium Ambient Background */}
       <div className="fixed inset-0 pointer-events-none z-0">
         <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] bg-blue-400/10 rounded-full blur-[120px]" />
@@ -194,37 +184,53 @@ export default function ScanLandingPage() {
             </div>
           ) : (
             <motion.div
-              whileHover={{ scale: 1.02, y: -4 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => handleRedirect(websiteLink)}
-              className="cursor-pointer p-6 bg-white/90 backdrop-blur-xl border border-white/40 shadow-xl rounded-3xl text-left flex items-center gap-5 group transition-all"
+              whileHover={!isExpired ? { scale: 1.02, y: -4 } : {}}
+              whileTap={!isExpired ? { scale: 0.98 } : {}}
+              onClick={() => !isExpired && handleRedirect(websiteLink)}
+              className={`p-6 bg-white/90 backdrop-blur-xl border border-white/40 shadow-xl rounded-3xl text-left flex items-center gap-5 group transition-all ${
+                isExpired ? 'opacity-60 grayscale cursor-not-allowed' : 'cursor-pointer'
+              }`}
             >
-              <div className="w-14 h-14 bg-blue-100 text-blue-500 rounded-2xl flex items-center justify-center shrink-0 group-hover:bg-blue-500 group-hover:text-white transition-all shadow-sm">
+              <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 transition-all shadow-sm ${
+                isExpired ? 'bg-gray-200 text-gray-400' : 'bg-blue-100 text-blue-500 group-hover:bg-blue-500 group-hover:text-white'
+              }`}>
                 <Globe size={28} />
               </div>
               <div className="flex-1">
-                <h3 className="font-bold text-slate-800 text-lg">Explore Here</h3>
-                <p className="text-sm text-slate-500">Visit our website or menu</p>
+                <h3 className={`font-bold text-lg ${isExpired ? 'text-slate-400' : 'text-slate-800'}`}>
+                  {isExpired ? 'Explore Disabled' : 'Explore Here'}
+                </h3>
+                <p className="text-sm text-slate-500">
+                  {isExpired ? 'Subscription inactive' : 'Visit our website or menu'}
+                </p>
               </div>
-              <ChevronRight className="text-slate-300 group-hover:text-slate-500 transition-all" />
+              {!isExpired && <ChevronRight className="text-slate-300 group-hover:text-slate-500 transition-all" />}
             </motion.div>
           )}
 
           {/* Review Card - Now below Explore */}
           <motion.div
-            whileHover={{ scale: 1.02, y: -4 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={() => navigate(`/r/${slug}`)}
-            className="cursor-pointer p-6 bg-white/90 backdrop-blur-xl border border-white/40 shadow-xl rounded-3xl text-left flex items-center gap-5 group transition-all"
+            whileHover={!isExpired ? { scale: 1.02, y: -4 } : {}}
+            whileTap={!isExpired ? { scale: 0.98 } : {}}
+            onClick={() => !isExpired && navigate(`/r/${slug}`)}
+            className={`p-6 bg-white/90 backdrop-blur-xl border border-white/40 shadow-xl rounded-3xl text-left flex items-center gap-5 group transition-all ${
+              isExpired ? 'opacity-60 grayscale cursor-not-allowed' : 'cursor-pointer'
+            }`}
           >
-            <div className="w-14 h-14 bg-amber-100 text-amber-500 rounded-2xl flex items-center justify-center shrink-0 group-hover:bg-amber-500 group-hover:text-white transition-all shadow-sm">
+            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 transition-all shadow-sm ${
+              isExpired ? 'bg-gray-200 text-gray-400' : 'bg-amber-100 text-amber-500 group-hover:bg-amber-500 group-hover:text-white'
+            }`}>
               <Star size={28} className="fill-current" />
             </div>
             <div className="flex-1">
-              <h3 className="font-bold text-slate-800 text-lg">Leave a Review</h3>
-              <p className="text-sm text-slate-500">Tell us about your experience</p>
+              <h3 className={`font-bold text-lg ${isExpired ? 'text-slate-400' : 'text-slate-800'}`}>
+                {isExpired ? 'Reviews Disabled' : 'Leave a Review'}
+              </h3>
+              <p className="text-sm text-slate-500">
+                {isExpired ? 'Subscription inactive' : 'Tell us about your experience'}
+              </p>
             </div>
-            <ChevronRight className="text-slate-300 group-hover:text-slate-500 transition-all" />
+            {!isExpired && <ChevronRight className="text-slate-300 group-hover:text-slate-500 transition-all" />}
           </motion.div>
         </div>
       </motion.div>

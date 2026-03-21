@@ -153,7 +153,7 @@ const PublicBusinessPage: React.FC = () => {
       const { data: reviewsData } = await supabase
         .from('reviews')
         .select('*')
-        .eq('owner_id', pageData.owner_id)
+        .eq('business_id', pageData.id)
         .order('created_at', { ascending: false })
         .limit(10);
       
@@ -188,28 +188,18 @@ const PublicBusinessPage: React.FC = () => {
     );
   }
 
-  if (isExpired) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-black p-6 text-center">
-        <div className="w-20 h-20 bg-amber-100 dark:bg-amber-900/20 text-amber-500 rounded-full flex items-center justify-center mb-6">
-          <AlertCircle size={40} />
-        </div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Business Inactive</h1>
-        <p className="text-gray-500 max-w-xs">This business is currently inactive. Please contact the owner for more information.</p>
-        <button 
-          onClick={() => window.location.href = '/'}
-          className="px-8 py-3 bg-blue-600 text-white rounded-xl font-bold mt-8"
-        >
-          Go Back
-        </button>
-      </div>
-    );
-  }
-
   const themeColor = page.theme_color || '#3b82f6';
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black pb-20">
+      {/* Inactive Banner */}
+      {isExpired && (
+        <div className="bg-amber-500 text-white py-3 px-6 text-center font-bold sticky top-0 z-[100] shadow-lg flex items-center justify-center gap-2">
+          <AlertCircle size={20} />
+          <span>Business Subscription Inactive - Explore & Reviews are temporarily disabled</span>
+        </div>
+      )}
+      
       {/* Hero Section */}
       <div className="relative h-64 md:h-80 w-full overflow-hidden">
         {page.cover_url ? (
@@ -292,13 +282,18 @@ const PublicBusinessPage: React.FC = () => {
             )}
             {links?.website_link && (
               <a 
-                href={links.website_link}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex flex-col items-center justify-center gap-2 py-4 bg-blue-500 text-white rounded-2xl font-bold shadow-lg transition-all hover:bg-blue-600 active:scale-95"
+                href={!isExpired ? links.website_link : undefined}
+                target={!isExpired ? "_blank" : undefined}
+                rel={!isExpired ? "noopener noreferrer" : undefined}
+                onClick={(e) => isExpired && e.preventDefault()}
+                className={`flex flex-col items-center justify-center gap-2 py-4 rounded-2xl font-bold shadow-lg transition-all ${
+                  isExpired 
+                    ? 'bg-gray-200 dark:bg-white/5 text-gray-400 cursor-not-allowed grayscale' 
+                    : 'bg-blue-500 text-white hover:bg-blue-600 active:scale-95'
+                }`}
               >
                 <Globe size={24} />
-                <span className="text-sm">Website</span>
+                <span className="text-sm">{isExpired ? 'Website Locked' : 'Website'}</span>
               </a>
             )}
             {page.address && (
@@ -397,10 +392,15 @@ const PublicBusinessPage: React.FC = () => {
               )}
               
               <button 
-                onClick={() => window.open(`#/r/${slug}`, '_blank')}
-                className="w-full py-4 bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-gray-400 rounded-2xl font-bold text-sm hover:bg-gray-200 dark:hover:bg-white/10 transition-all flex items-center justify-center gap-2"
+                onClick={() => !isExpired && window.open(`#/r/${slug}`, '_blank')}
+                disabled={isExpired}
+                className={`w-full py-4 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+                  isExpired 
+                    ? 'bg-gray-200 dark:bg-white/5 text-gray-400 cursor-not-allowed' 
+                    : 'bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/10'
+                }`}
               >
-                Leave a Review
+                {isExpired ? 'Reviews Disabled' : 'Leave a Review'}
                 <ChevronRight size={16} />
               </button>
             </div>

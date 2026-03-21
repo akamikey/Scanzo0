@@ -39,19 +39,30 @@ const Insights: React.FC = () => {
         return;
       }
 
-      // 2. Fetch reviews from the last 7 days
+      // 2. Fetch reviews from the last 7 days (both public and private)
       const sevenDaysAgo = new Date();
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
       sevenDaysAgo.setHours(0, 0, 0, 0);
 
-      const { data: reviews, error } = await supabase
-        .from('reviews')
-        .select('rating, created_at')
-        .in('business_id', businessIds)
-        .gte('created_at', sevenDaysAgo.toISOString())
-        .order('created_at', { ascending: true });
+      const [reviewsRes, privateRes] = await Promise.all([
+        supabase
+          .from('reviews')
+          .select('rating, created_at')
+          .in('business_id', businessIds)
+          .gte('created_at', sevenDaysAgo.toISOString())
+          .order('created_at', { ascending: true }),
+        supabase
+          .from('private_reviews')
+          .select('rating, created_at')
+          .in('business_id', businessIds)
+          .gte('created_at', sevenDaysAgo.toISOString())
+          .order('created_at', { ascending: true })
+      ]);
 
-      if (error) throw error;
+      if (reviewsRes.error) throw reviewsRes.error;
+      if (privateRes.error) throw privateRes.error;
+
+      const allReviews = [...(reviewsRes.data || []), ...(privateRes.data || [])];
 
       // 3. Process data for the last 7 days
       const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -63,7 +74,7 @@ const Insights: React.FC = () => {
         const dayName = days[d.getDay()];
         const dateStr = d.toISOString().split('T')[0];
 
-        const dayReviews = reviews?.filter(r => r.created_at.startsWith(dateStr)) || [];
+        const dayReviews = allReviews?.filter(r => r.created_at.startsWith(dateStr)) || [];
         const avgRating = dayReviews.length > 0 
           ? dayReviews.reduce((acc, curr) => acc + curr.rating, 0) / dayReviews.length 
           : 0;

@@ -29,8 +29,8 @@ const Dashboard: React.FC = () => {
     
     fetchDashboardData();
 
-    // Set up real-time subscription
-    const channel = supabase
+    // Set up real-time subscription for both public and private reviews
+    const reviewsChannel = supabase
       .channel('dashboard_reviews')
       .on(
         'postgres_changes',
@@ -45,12 +45,28 @@ const Dashboard: React.FC = () => {
       )
       .subscribe();
 
+    const privateReviewsChannel = supabase
+      .channel('dashboard_private_reviews')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'private_reviews'
+        },
+        () => {
+          fetchDashboardData();
+        }
+      )
+      .subscribe();
+
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(reviewsChannel);
+      supabase.removeChannel(privateReviewsChannel);
     };
   }, [user]);
 
-  const fetchDashboardData = async (retryCount = 0) => {
+  const fetchDashboardData = async () => {
     if (!user) return;
     try {
         // 1. Fetch business IDs for the user
@@ -66,10 +82,10 @@ const Dashboard: React.FC = () => {
             return;
         }
 
-        // 2. Fetch All Reviews (Public and Private)
+        // 2. Fetch All Reviews (Public and Private) using business_id
         const [reviewsRes, privateRes] = await Promise.all([
-            supabase.from('reviews').select('*').eq('owner_id', user.id).order('created_at', { ascending: false }),
-            supabase.from('private_reviews').select('*').eq('owner_id', user.id).order('created_at', { ascending: false })
+            supabase.from('reviews').select('*').in('business_id', businessIds).order('created_at', { ascending: false }),
+            supabase.from('private_reviews').select('*').in('business_id', businessIds).order('created_at', { ascending: false })
         ]);
 
         if (reviewsRes.error) throw reviewsRes.error;

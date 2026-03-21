@@ -16,6 +16,7 @@
     "@types/body-parser": "^1.19.6",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
+    "axios": "^1.13.6",
     "body-parser": "^2.2.2",
     "canvas-confetti": "^1.9.2",
     "clsx": "^2.1.1",

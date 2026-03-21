@@ -112,8 +112,8 @@ const ReviewsPage: React.FC = () => {
     
     fetchReviews();
 
-    // Set up real-time subscription
-    const channel = supabase
+    // Set up real-time subscription for both public and private reviews
+    const reviewsChannel = supabase
       .channel('reviews_changes')
       .on(
         'postgres_changes',
@@ -128,42 +128,67 @@ const ReviewsPage: React.FC = () => {
       )
       .subscribe();
 
+    const privateReviewsChannel = supabase
+      .channel('private_reviews_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'private_reviews'
+        },
+        () => {
+          fetchReviews();
+        }
+      )
+      .subscribe();
+
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(reviewsChannel);
+      supabase.removeChannel(privateReviewsChannel);
     };
   }, [user]);
 
   const fetchReviews = async (retryCount = 0) => {
     if (!user) return;
     try {
-      // First fetch business IDs for the user
+      // 1. Fetch business IDs for the user
       const { data: businesses } = await supabase
         .from('businesses')
         .select('id')
         .eq('owner_id', user.id);
       
       const businessIds = businesses?.map(b => b.id) || [];
-      
+
       if (businessIds.length === 0) {
           setLoading(false);
           return;
       }
 
-      const { data, error } = await supabase
-        .from('reviews')
-        .select('*')
-        .in('business_id', businessIds)
-        .order('created_at', { ascending: false });
+      // 2. Fetch both public and private reviews using business_id
+      const [reviewsRes, privateRes] = await Promise.all([
+        supabase.from('reviews').select('*').in('business_id', businessIds).order('created_at', { ascending: false }),
+        supabase.from('private_reviews').select('*').in('business_id', businessIds).order('created_at', { ascending: false })
+      ]);
 
-      if (error) {
-          if (error.message?.includes('Failed to fetch') && retryCount < 3) {
+      if (reviewsRes.error) {
+          if (reviewsRes.error.message?.includes('Failed to fetch') && retryCount < 3) {
               console.debug(`Retrying reviews fetch (${retryCount + 1}/3)...`);
               await new Promise(resolve => setTimeout(resolve, 1000));
               return fetchReviews(retryCount + 1);
           }
-          throw error;
+          throw reviewsRes.error;
       }
-      setReviews(data || []);
+
+      if (privateRes.error) throw privateRes.error;
+
+      // Combine and sort
+      const allReviews = [
+          ...(reviewsRes.data || []),
+          ...(privateRes.data || [])
+      ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+      setReviews(allReviews || []);
     } catch (err) {
       console.error('Error fetching reviews:', err);
     } finally {
