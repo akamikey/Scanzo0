@@ -122,9 +122,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const isActive = sub.status === 'active' || sub.status === 'authenticated' || sub.status === 'completed';
 
         let planName = sub.plan_id;
-        if (planName === 'plan_SBmRucECQ7R5dJ') planName = 'Monthly';
-        else if (planName === 'plan_SBmc0r5xUg65iM') planName = '6 Months';
-        else if (planName === 'plan_SM3t9nNkfUECGe') planName = 'Yearly';
+        if (planName === 'plan_STxKdWOYODRHqL') planName = 'Monthly';
+        else if (planName === 'plan_STxMY7FBbIvQcJ') planName = '6 Months';
+        else if (planName === 'plan_SUIxB3anFaPXYG') planName = 'Yearly';
         else if (planName?.includes('monthly')) planName = 'Monthly';
         else if (planName?.includes('biannual')) planName = '6 Months';
         else if (planName?.includes('annual')) planName = 'Yearly';

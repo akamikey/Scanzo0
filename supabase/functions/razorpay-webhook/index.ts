@@ -44,7 +44,7 @@ serve(async (req) => {
         } else if (amount === 1250) {
             planType = 'biannual' // Mapped to '6 Months' plan ID
             durationDays = 180
-        } else if (amount === 2250) {
+        } else if (amount === 2500) {
             planType = 'annual' // Mapped to 'Yearly' plan ID
             durationDays = 365
         } else {

@@ -182,7 +182,7 @@ const LandingPage: React.FC = () => {
           {[
             { name: 'Monthly', price: '₹250', delay: 0.1, savings: '' },
             { name: '6 Months', price: '₹1250', popular: true, delay: 0.2, savings: 'Save ₹250' },
-            { name: 'Yearly', price: '₹2250', delay: 0.3, savings: 'Save ₹750' },
+            { name: 'Yearly', price: '₹2500', delay: 0.3, savings: 'Save ₹500' },
           ].map((plan) => (
             <motion.div 
               key={plan.name}

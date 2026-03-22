@@ -31,8 +31,8 @@ SET search_path = extensions, public
 AS $$
 DECLARE
   -- REPLACE THESE WITH YOUR ACTUAL RAZORPAY KEYS
-  v_key_id text := 'YOUR_KEY_ID_HERE'; 
-  v_key_secret text := 'YOUR_KEY_SECRET_HERE';
+  v_key_id text := 'rzp_live_STxlKmH3jUfhCg'; 
+  v_key_secret text := 'QyH1Z6s0wV6N23z7XRmEe53q';
   
   v_order_response json;
   v_url text := 'https://api.razorpay.com/v1/orders';
@@ -96,7 +96,7 @@ SET search_path = extensions, public
 AS $$
 DECLARE
   -- REPLACE THIS WITH YOUR ACTUAL RAZORPAY KEY SECRET
-  v_key_secret text := 'YOUR_KEY_SECRET_HERE';
+  v_key_secret text := 'QyH1Z6s0wV6N23z7XRmEe53q';
   
   v_generated_signature text;
   v_duration_days integer;
@@ -111,22 +111,22 @@ BEGIN
   END IF;
 
   -- Determine Plan Details
-  IF p_plan_id = 'starter' THEN
-    v_duration_days := 30;
-    v_plan_name := 'Starter';
-    v_amount := 250;
-  ELSIF p_plan_id = 'monthly' THEN
+  IF p_plan_id = 'starter' OR p_plan_id = 'plan_STxKdWOYODRHqL' THEN
     v_duration_days := 30;
     v_plan_name := 'Monthly';
     v_amount := 250;
-  ELSIF p_plan_id = 'biannual' THEN
+  ELSIF p_plan_id = 'monthly' OR p_plan_id = 'plan_STxKdWOYODRHqL' THEN
+    v_duration_days := 30;
+    v_plan_name := 'Monthly';
+    v_amount := 250;
+  ELSIF p_plan_id = 'biannual' OR p_plan_id = 'plan_STxMY7FBbIvQcJ' THEN
     v_duration_days := 180;
     v_plan_name := '6 Months';
     v_amount := 1250;
-  ELSIF p_plan_id = 'annual' THEN
+  ELSIF p_plan_id = 'annual' OR p_plan_id = 'plan_SUIxB3anFaPXYG' THEN
     v_duration_days := 365;
     v_plan_name := 'Yearly';
-    v_amount := 2250;
+    v_amount := 2500;
   ELSE
     v_duration_days := 30;
     v_plan_name := 'Unknown';
@@ -134,23 +134,25 @@ BEGIN
   END IF;
 
   -- Update Subscription
-  INSERT INTO subscriptions (owner_id, plan_name, amount_paid, active, payment_id, end_date, updated_at)
+  INSERT INTO subscriptions (owner_id, plan_id, status, current_period_end, amount_paid, active, razorpay_subscription_id, updated_at)
   VALUES (
     p_user_id,
-    v_plan_name,
+    p_plan_id,
+    'active',
+    now() + (v_duration_days || ' days')::interval,
     v_amount,
     true,
-    p_payment_id,
-    now() + (v_duration_days || ' days')::interval,
+    p_payment_id, -- Using payment_id as subscription_id for manual/one-time payments
     now()
   )
   ON CONFLICT (owner_id) DO UPDATE
   SET
-    plan_name = excluded.plan_name,
+    plan_id = excluded.plan_id,
+    status = 'active',
+    current_period_end = excluded.current_period_end,
     amount_paid = excluded.amount_paid,
     active = true,
-    payment_id = excluded.payment_id,
-    end_date = excluded.end_date,
+    razorpay_subscription_id = excluded.razorpay_subscription_id,
     updated_at = now();
 
   RETURN json_build_object('success', true);

@@ -70,11 +70,16 @@ const PricingPage: React.FC = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
-              className="p-8 rounded-3xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 flex flex-col"
+              className="p-8 rounded-3xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 flex flex-col relative"
             >
+              <div className="absolute top-0 right-8 transform -translate-y-1/2">
+                <span className="bg-green-500 text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wide shadow-sm">
+                  Save ₹500
+                </span>
+              </div>
               <h3 className="text-lg font-bold text-slate-500 mb-2">Yearly</h3>
               <div className="flex items-baseline gap-1 mb-8">
-                <span className="text-4xl font-bold">₹2250</span>
+                <span className="text-4xl font-bold">₹2500</span>
               </div>
               <button onClick={handleGetStarted} className="mt-auto w-full py-3 rounded-xl border border-slate-200 dark:border-slate-700 font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
                 Get Started

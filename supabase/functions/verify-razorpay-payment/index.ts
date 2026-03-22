@@ -45,7 +45,7 @@ serve(async (req) => {
     } else if (plan_id === 'annual') {
         durationDays = 365;
         planName = 'Yearly';
-        amount = 2250;
+        amount = 2500;
     }
 
     const endDate = new Date();

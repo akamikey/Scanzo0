@@ -28,9 +28,9 @@ const PLANS = [
   {
     id: 'annual',
     name: 'Yearly Plan',
-    price: 2250,
-    planId: 'plan_STxNeYFeyNGw6J',
-    savings: 'Save ₹750',
+    price: 2500,
+    planId: 'plan_SUIxB3anFaPXYG',
+    savings: 'Save ₹500',
     color: 'from-orange-500 to-red-500',
     popular: false,
   },
@@ -47,12 +47,14 @@ import Footer from '../components/Footer';
 const SubscribePage: React.FC = () => {
   const { user, session, subscription, refreshData } = useAuth();
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const [fallbackData, setFallbackData] = useState<{ planId: string, url: string } | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
 
   // Animation states
   const [paymentStatus, setPaymentStatus] = useState<'idle' | 'activating' | 'success' | 'cancelled'>('idle');
   const [activePlanId, setActivePlanId] = useState<string | null>(null);
+  const [errorDetails, setErrorDetails] = useState<{ message: string, details?: string, help?: string } | null>(null);
 
   useEffect(() => {
     const paymentId = searchParams.get('razorpay_payment_id');
@@ -166,18 +168,33 @@ const SubscribePage: React.FC = () => {
             }),
         });
 
-        const data = await response.json();
+        let data;
+        const responseText = await response.text();
+        try {
+            data = JSON.parse(responseText);
+        } catch (e) {
+            console.error('Server returned non-JSON response:', responseText);
+            throw new Error(`Server Error (${response.status}): ${responseText.slice(0, 100)}...`);
+        }
 
         if (!response.ok) {
+            let helpText = data.help;
+            if (data.error?.includes('Customer payment is not allowed')) {
+                helpText = "This usually means the subscription is already active or your Razorpay account is not fully configured for Subscriptions. Please ensure 'Subscriptions' are enabled in your Razorpay dashboard and you are using LIVE keys for LIVE plans.";
+            }
+            setErrorDetails({
+                message: data.error || 'Failed to create subscription',
+                details: data.details,
+                help: helpText
+            });
             throw new Error(data.error || 'Failed to create subscription');
         }
 
         // Handle redirect flow (fallback links)
         if (data.is_fallback || !data.key_id) {
             if (data.short_url) {
-                // Use window.open for fallback links to avoid X-Frame-Options issues in iframes
-                window.open(data.short_url, '_blank');
-                setProcessingId(null);
+                // Directly redirect to the payment page to avoid intermediate step
+                window.location.href = data.short_url;
                 return;
             } else {
                 throw new Error('No payment URL received');
@@ -193,6 +210,9 @@ const SubscribePage: React.FC = () => {
             handler: function (response: any) {
                 // Redirect to self with success params to trigger animation
                 navigate(`/subscribe?razorpay_payment_id=${response.razorpay_payment_id}&plan=${plan.id}`, { replace: true });
+            },
+            prefill: {
+                email: user.email,
             },
             theme: {
                 color: "#3B82F6"
@@ -213,7 +233,10 @@ const SubscribePage: React.FC = () => {
 
     } catch (error: any) {
         console.error('Payment error:', error);
-        alert(`Payment error: ${error.message || 'Unknown error'}`);
+        // If we didn't already set errorDetails, set a generic one
+        if (!errorDetails) {
+            setErrorDetails({ message: error.message || 'Unknown error' });
+        }
         setPaymentStatus('cancelled');
         setActivePlanId(plan.id);
         setProcessingId(null);
@@ -222,6 +245,42 @@ const SubscribePage: React.FC = () => {
 
   return (
     <div className="space-y-8 relative pb-20 min-h-screen">
+      {/* Error Modal */}
+      <AnimatePresence>
+        {errorDetails && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="bg-white dark:bg-slate-900 rounded-3xl p-8 max-w-md w-full shadow-2xl border border-red-500/20"
+            >
+              <div className="flex flex-col items-center text-center">
+                <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 text-red-600 rounded-full flex items-center justify-center mb-6">
+                  <AlertCircle size={32} />
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">{errorDetails.message}</h3>
+                {errorDetails.details && (
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">{errorDetails.details}</p>
+                )}
+                {errorDetails.help && (
+                  <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-2xl text-left mb-6 border border-blue-100 dark:border-blue-500/20">
+                    <p className="text-xs font-bold text-blue-700 dark:text-blue-300 uppercase tracking-wider mb-1">💡 Pro Tip</p>
+                    <p className="text-sm text-blue-600 dark:text-blue-400">{errorDetails.help}</p>
+                  </div>
+                )}
+                <button 
+                  onClick={() => setErrorDetails(null)}
+                  className="w-full py-3 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-xl font-bold hover:opacity-90 transition-all"
+                >
+                  Got it, thanks
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* Dim Overlay */}
       <AnimatePresence>
         {(paymentStatus === 'activating' || paymentStatus === 'success') && (

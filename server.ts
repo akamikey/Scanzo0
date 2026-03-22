@@ -4,41 +4,179 @@ import bodyParser from 'body-parser';
 import Razorpay from 'razorpay';
 import crypto from 'crypto';
 import { createClient } from '@supabase/supabase-js';
-// import { createServer as createViteServer } from 'vite'; // Use dynamic import instead
-import 'dotenv/config';
-
 import path from 'path';
 import { fileURLToPath } from 'url';
+import fs from 'fs';
+import 'dotenv/config';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+console.log('[Server] Starting server initialization...');
 
 const app = express();
 const PORT = 3000;
 
-// Initialize Supabase Admin Client
-const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || 'https://senkiwubyxeozgvycwjo.supabase.co';
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNlbmtpd3VieXhlb3pndnljd2pvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU5NjQyNTMsImV4cCI6MjA4MTU0MDI1M30.97V4aCtU464P2rT6PQn57uUvDsuTpKbsF_vRW0R-3hQ';
-
-if (!supabaseUrl || !supabaseKey) {
-  console.warn('Missing Supabase credentials. Webhooks may fail.');
-}
-
-const supabase = (supabaseUrl && supabaseKey) 
-  ? createClient(supabaseUrl, supabaseKey) 
-  : null;
-
-// Initialize Razorpay
-const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID || 'rzp_live_STxlKmH3jUfhCg',
-  key_secret: process.env.RAZORPAY_KEY_SECRET || 'QyH1Z6s0wV6N23z7XRmEe53q',
-});
-
+// 1. Basic Middleware
 app.use(cors());
 
+// 2. Diagnostics endpoint (Absolute top, no complex logic)
+app.get('/api/diagnostics', async (req, res) => {
+  try {
+    const keyId = process.env.RAZORPAY_KEY_ID?.trim();
+    const keySecret = process.env.RAZORPAY_KEY_SECRET?.trim();
+    
+    let razorpayStatus = 'not_tested';
+    let razorpayError = null;
+
+    if (keyId && keySecret) {
+        try {
+            const rzp = getRazorpayInstance();
+            if (rzp) {
+                // Try to fetch plans to test authentication
+                const plans = await rzp.plans.all({ count: 1 });
+                razorpayStatus = 'authenticated';
+                console.log(`[Diagnostics] Razorpay authenticated successfully. Found ${plans.items.length} plans.`);
+            } else {
+                razorpayStatus = 'missing_keys';
+                razorpayError = 'RAZORPAY_KEY_ID or RAZORPAY_KEY_SECRET is missing or empty.';
+            }
+        } catch (err: any) {
+            razorpayStatus = 'failed';
+            razorpayError = err.error?.description || err.message;
+            const statusCode = err.statusCode || (err.error ? err.error.code : 'UNKNOWN');
+            console.error(`[Diagnostics] Razorpay authentication failed (Status: ${statusCode}): ${razorpayError}`);
+            
+            // Manual check with axios to confirm if it's a library issue
+            try {
+                const axios = (await import('axios')).default;
+                
+                // Try without prefix
+                const secretNoPrefix = keySecret.replace('rzp_live_', '').replace('rzp_test_', '');
+                const authHeaderNoPrefix = `Basic ${Buffer.from(`${keyId}:${secretNoPrefix}`).toString('base64')}`;
+                
+                try {
+                    await axios.get('https://api.razorpay.com/v1/plans?count=1', {
+                        headers: { 'Authorization': authHeaderNoPrefix }
+                    });
+                    console.log('[Diagnostics] Manual axios check SUCCEEDED WITHOUT prefix.');
+                    razorpayStatus = 'authenticated_manual_no_prefix';
+                } catch (errNoPrefix) {
+                    console.warn('[Diagnostics] Manual axios check FAILED WITHOUT prefix.');
+                    
+                    // Try WITH prefix
+                    const authHeaderWithPrefix = `Basic ${Buffer.from(`${keyId}:${keySecret}`).toString('base64')}`;
+                    try {
+                        await axios.get('https://api.razorpay.com/v1/plans?count=1', {
+                            headers: { 'Authorization': authHeaderWithPrefix }
+                        });
+                        console.log('[Diagnostics] Manual axios check SUCCEEDED WITH prefix.');
+                        razorpayStatus = 'authenticated_manual_with_prefix';
+                    } catch (errWithPrefix: any) {
+                        console.error('[Diagnostics] Manual axios check also FAILED WITH prefix:', errWithPrefix.response?.data?.error?.description || errWithPrefix.message);
+                        if (razorpayError.includes('Authentication failed')) {
+                            razorpayError += ' (Check if your Key ID and Secret match exactly what is in your Razorpay dashboard. Ensure you are using LIVE keys for LIVE plans.)';
+                        }
+                    }
+                }
+            } catch (axiosErr: any) {
+                console.error('[Diagnostics] Manual axios check error:', axiosErr.message);
+            }
+        }
+    }
+
+    res.json({
+      status: 'ok',
+      vercel: !!process.env.VERCEL,
+      node: process.version,
+      razorpay: {
+          status: razorpayStatus,
+          error: razorpayError,
+          key_id: keyId ? `${keyId.substring(0, 8)}...` : 'MISSING',
+          secret_prefix: keySecret ? `${keySecret.substring(0, 4)}...` : 'MISSING',
+          key_type: keyId?.startsWith('rzp_live') ? 'LIVE' : keyId?.startsWith('rzp_test') ? 'TEST' : 'UNKNOWN'
+      },
+      env_check: {
+        has_razorpay_id: !!keyId,
+        has_razorpay_secret: !!keySecret,
+        has_supabase_url: !!process.env.VITE_SUPABASE_URL || !!process.env.SUPABASE_URL,
+        has_supabase_key: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+        has_app_url: !!process.env.APP_URL
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Diagnostics failed', message: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+// 3. Body Parsing
 // Webhook route - needs raw body for signature verification
 app.use('/api/webhook/razorpay', bodyParser.raw({ type: 'application/json' }));
 app.use(bodyParser.json());
+
+// 4. Initialize Services Safely
+const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || 'https://senkiwubyxeozgvycwjo.supabase.co';
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNlbmtpd3VieXhlb3pndnljd2pvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU5NjQyNTMsImV4cCI6MjA4MTU0MDI1M30.97V4aCtU464P2rT6PQn57uUvDsuTpKbsF_vRW0R-3hQ';
+
+let supabase: any = null;
+try {
+  if (supabaseUrl && supabaseKey) {
+    supabase = createClient(supabaseUrl, supabaseKey);
+    console.log('[Server] Supabase client initialized');
+  }
+} catch (e) {
+  console.error('[Server] Supabase Init Error:', e);
+}
+
+// Helper to get Razorpay instance with fresh environment variables
+const getRazorpayInstance = () => {
+  try {
+    let key_id = process.env.RAZORPAY_KEY_ID?.trim();
+    let key_secret = process.env.RAZORPAY_KEY_SECRET?.trim();
+
+    if (!key_id || !key_secret) {
+      console.warn('[Server] Razorpay keys missing in environment');
+      return null;
+    }
+
+    // Defensive: Strip rzp_live_ or rzp_test_ prefix from secret if user accidentally included it
+    // Most Razorpay secrets are 24 chars and don't have prefixes.
+    if (key_secret.startsWith('rzp_live_')) {
+        console.log('[Server] Stripping rzp_live_ prefix from Key Secret');
+        key_secret = key_secret.replace('rzp_live_', '');
+    } else if (key_secret.startsWith('rzp_test_')) {
+        console.log('[Server] Stripping rzp_test_ prefix from Key Secret');
+        key_secret = key_secret.replace('rzp_test_', '');
+    }
+
+    console.log(`[Server] Initializing Razorpay with Key ID: ${key_id.substring(0, 8)}... and Secret Prefix: ${key_secret.substring(0, 4)}... (Length: ${key_secret.length})`);
+
+    // In ESM, the default export might be nested
+    const RazorpayConstructor = (Razorpay as any).default || Razorpay;
+    
+    try {
+        const instance = new RazorpayConstructor({
+          key_id,
+          key_secret,
+        });
+        return instance;
+    } catch (constError) {
+        console.error('[Server] Razorpay Constructor Error:', constError);
+        // Fallback to direct new Razorpay if the above fails
+        // @ts-ignore
+        return new Razorpay({ key_id, key_secret });
+    }
+  } catch (e) {
+    console.error('[Server] Razorpay Instance Creation Error:', e);
+    return null;
+  }
+};
+
+// Initial check
+const initialRzp = getRazorpayInstance();
+if (initialRzp) {
+    console.log(`[Server] Razorpay initialized with Key ID: ${process.env.RAZORPAY_KEY_ID?.substring(0, 8)}...`);
+} else {
+    console.warn(`[Server] Razorpay keys missing or invalid in environment.`);
+}
 
 // API Routes
 
@@ -52,15 +190,15 @@ const getCleanPlanId = (envVar: string | undefined, fallback: string) => {
 const PLAN_CONFIG: Record<string, { id: string | undefined, total_count: number }> = {
   'monthly': { 
     id: getCleanPlanId(process.env.RAZORPAY_PLAN_MONTHLY, 'plan_STxKdWOYODRHqL'),
-    total_count: 60 // 5 years
+    total_count: 120 // 10 years
   },
   'biannual': { 
     id: getCleanPlanId(process.env.RAZORPAY_PLAN_BIANNUAL, 'plan_STxMY7FBbIvQcJ'),
-    total_count: 10 // 5 years
+    total_count: 20 // 10 years (6 months * 20 = 120 months)
   },
   'annual': { 
-    id: getCleanPlanId(process.env.RAZORPAY_PLAN_ANNUAL, 'plan_STxNeYFeyNGw6J'),
-    total_count: 5 // 5 years
+    id: getCleanPlanId(process.env.RAZORPAY_PLAN_ANNUAL, 'plan_SUIxB3anFaPXYG'),
+    total_count: 10 // 10 years
   },
   'test': {
     id: process.env.RAZORPAY_PLAN_TEST,
@@ -69,17 +207,19 @@ const PLAN_CONFIG: Record<string, { id: string | undefined, total_count: number 
 };
 
 const FALLBACK_LINKS: Record<string, string> = {
-  'monthly': 'https://rzp.io/rzp/nZnTHmQ',
-  'biannual': 'https://rzp.io/rzp/MT7xfzg',
-  'annual': 'https://rzp.io/rzp/XGJVvxe',
+  'monthly': 'https://rzp.io/rzp/nsZoidF',
+  'biannual': 'https://rzp.io/rzp/hkHwFb9S',
+  'annual': 'https://rzp.io/rzp/rAkjU3k',
 };
 
 // 1. Create Subscription Link
 app.post('/api/create-subscription', async (req, res) => {
   try {
-    const { planId, userId } = req.body;
+    const { planId, userId } = req.body || {};
+    console.log(`[API] Create Subscription Request - Plan: ${planId}, User: ${userId}`);
 
     if (!planId || !userId) {
+      console.warn('[API] Missing planId or userId in request body');
       return res.status(400).json({ error: 'Missing planId or userId' });
     }
 
@@ -114,9 +254,8 @@ app.post('/api/create-subscription', async (req, res) => {
         });
     };
 
-    // If no Razorpay Plan ID or Key ID is configured, use fallback link immediately
+    // If no Razorpay Plan ID is configured, use fallback link immediately
     if (!razorpayPlanId || 
-        !process.env.RAZORPAY_KEY_ID ||
         razorpayPlanId.includes('plan_monthly_id') || 
         razorpayPlanId.includes('plan_biannual_id') || 
         razorpayPlanId.includes('plan_annual_id')) {
@@ -125,35 +264,86 @@ app.post('/api/create-subscription', async (req, res) => {
       return returnFallback();
     }
 
-    console.log(`Creating subscription for user ${userId} with plan ${razorpayPlanId}`);
+    const rzp = getRazorpayInstance();
+
+    if (!rzp) {
+        console.log(`[API] Razorpay instance could not be created (missing keys). Using fallback for ${planId}.`);
+        return returnFallback();
+    }
+
+    console.log(`[API] Creating subscription for user ${userId} with plan ${razorpayPlanId} using Key ID: ${process.env.RAZORPAY_KEY_ID?.substring(0, 8)}...`);
 
     try {
       // Create Subscription
-      const subscription = await razorpay.subscriptions.create({
+      // Adding start_at (1 minute in future) can sometimes resolve "payment not allowed" errors
+      // and ensures the subscription is ready for the first payment.
+      const startAt = Math.floor(Date.now() / 1000) + 60;
+
+      const subscription = await rzp.subscriptions.create({
         plan_id: razorpayPlanId,
         total_count: planConfig.total_count,
         quantity: 1,
         customer_notify: 1,
+        start_at: startAt,
+        addons: [],
         notes: {
           user_id: userId,
           internal_plan_id: planId
         }
       });
 
+      console.log(`[API] Subscription created successfully: ${subscription.id}`);
+
       res.json({
         id: subscription.id,
         short_url: subscription.short_url,
         status: subscription.status,
-        key_id: process.env.RAZORPAY_KEY_ID || 'rzp_live_STxlKmH3jUfhCg' // Send the same key used for initialization
+        key_id: process.env.RAZORPAY_KEY_ID
       });
     } catch (apiError: any) {
       const errorDesc = apiError.error?.description || apiError.message;
-      console.warn(`Razorpay Subscription API failed for plan ${planId} (${razorpayPlanId}). Error: ${errorDesc}`);
+      const keyPrefix = (process.env.RAZORPAY_KEY_ID || 'MISSING').trim().substring(0, 8) + '...';
+      console.warn(`[API] Razorpay Subscription API failed for plan ${planId} (${razorpayPlanId}) using key ${keyPrefix}. Error: ${errorDesc}`);
       
       // If the error is about invalid ID, definitely use fallback
       if (errorDesc.includes('id provided does not exist') || errorDesc.includes('The id provided does not exist')) {
+          // If the user is trying to use their own plan ID, return an error instead of falling back to our links
+          const configuredPlanIds = Object.values(PLAN_CONFIG).map(p => p.id).filter(Boolean);
+          if (!configuredPlanIds.includes(razorpayPlanId)) {
+              return res.status(500).json({ 
+                  error: `Razorpay Subscription API failed: The provided plan ID (${razorpayPlanId}) does not exist in your Razorpay account.` 
+              });
+          }
           console.log('Invalid Plan ID detected. Switching to fallback.');
           return returnFallback();
+      }
+      
+      // If authentication fails, it's likely a mismatch between keys and plan ID
+      if (errorDesc.includes('Authentication failed') || errorDesc.includes('Unauthorized')) {
+          const configuredPlanIds = Object.values(PLAN_CONFIG).map(p => p.id).filter(Boolean);
+          const isFallbackPlan = configuredPlanIds.includes(razorpayPlanId);
+          const keyId = process.env.RAZORPAY_KEY_ID || 'MISSING';
+          
+          console.error(`[API] Razorpay Authentication Failed!`);
+          console.error(`- Plan ID: ${razorpayPlanId}`);
+          console.error(`- Key ID: ${keyId.substring(0, 8)}...`);
+          console.error(`- Key Type: ${keyId.startsWith('rzp_live') ? 'LIVE' : keyId.startsWith('rzp_test') ? 'TEST' : 'UNKNOWN'}`);
+          console.error(`- Secret Length: ${process.env.RAZORPAY_KEY_SECRET?.length || 0}`);
+
+          if (isFallbackPlan) {
+              console.warn(`[API] Authentication failed for fallback plan. Switching to fallback link.`);
+              return returnFallback();
+          }
+          
+          return res.status(401).json({ 
+              error: `Razorpay Authentication Failed`,
+              details: `The Key ID or Key Secret provided is invalid for your Razorpay account. Please verify your credentials in the Settings menu.`,
+              help: `Ensure you are using LIVE keys for LIVE plans and TEST keys for TEST plans. Your current Key ID starts with ${keyId.substring(0, 8)}.`,
+              debug: {
+                  key_prefix: keyId.substring(0, 8),
+                  plan_id: razorpayPlanId
+              }
+          });
       }
       
       // For other errors, also try fallback
@@ -190,34 +380,36 @@ app.post('/api/webhook/razorpay', async (req: any, res) => {
       const event = body.event;
       const payload = body.payload;
 
-      if (event === 'subscription.activated') {
+      if (event === 'subscription.activated' || event === 'subscription.charged') {
         const sub = payload.subscription.entity;
         const userId = sub.notes?.user_id;
         const planId = sub.notes?.internal_plan_id;
 
         if (userId) {
-            console.log(`Activating subscription for user ${userId}`);
+            console.log(`[Webhook] ${event} for user ${userId}. Plan: ${planId}`);
             
             if (!supabase) {
                 console.error('Supabase client not initialized - missing credentials');
                 return res.status(500).json({ error: 'Server configuration error' });
             }
 
-            // 1. Insert into 'subscriptions' table
+            // 1. Upsert into 'subscriptions' table
             const endDate = new Date(sub.current_end * 1000).toISOString();
+            const amountPaid = sub.item?.amount ? sub.item.amount / 100 : 0;
             
             const { error: subError } = await supabase
                 .from('subscriptions')
-                .insert({
+                .upsert({
                     owner_id: userId,
                     status: 'active',
                     current_period_end: endDate,
                     plan_id: planId,
-                    amount_paid: sub.item?.amount ? sub.item.amount / 100 : 0,
-                    razorpay_subscription_id: sub.id
-                });
+                    amount_paid: amountPaid,
+                    razorpay_subscription_id: sub.id,
+                    updated_at: new Date().toISOString()
+                }, { onConflict: 'razorpay_subscription_id' });
 
-            if (subError) console.error('Error inserting into subscriptions table:', subError);
+            if (subError) console.error('Error upserting into subscriptions table:', subError);
 
             // 2. Update 'businesses' table status
             const { error: bizError } = await supabase
@@ -229,6 +421,25 @@ app.post('/api/webhook/razorpay', async (req: any, res) => {
                 .eq('owner_id', userId);
 
             if (bizError) console.error('Error updating businesses table:', bizError);
+        }
+      } else if (event === 'subscription.cancelled' || event === 'subscription.halted') {
+        const sub = payload.subscription.entity;
+        const userId = sub.notes?.user_id;
+
+        if (userId) {
+            console.log(`[Webhook] ${event} for user ${userId}`);
+            
+            if (supabase) {
+                await supabase
+                    .from('businesses')
+                    .update({ subscription_status: 'cancelled' })
+                    .eq('owner_id', userId);
+                
+                await supabase
+                    .from('subscriptions')
+                    .update({ status: 'cancelled' })
+                    .eq('razorpay_subscription_id', sub.id);
+            }
         }
       }
       
@@ -270,8 +481,14 @@ app.post('/api/restore-purchase', async (req, res) => {
   let isSubscription = false;
 
   try {
+      const rzp = getRazorpayInstance();
+      if (!rzp) {
+          console.error('[Restore] Razorpay instance missing - cannot fetch subscriptions');
+          return res.status(500).json({ error: 'Razorpay configuration missing' });
+      }
+
       // 1. Check Subscriptions
-      const subscriptions = await razorpay.subscriptions.all({ count: 50 });
+      const subscriptions = await rzp.subscriptions.all({ count: 50 });
       for (const sub of subscriptions.items) {
           if ((sub.notes && sub.notes.user_id === user.id) || 
               (sub.notes && sub.notes.email === email)) {
@@ -296,7 +513,7 @@ app.post('/api/restore-purchase', async (req, res) => {
 
       // 2. Check Payments (Fallback)
       if (!foundValidPayment) {
-          const payments = await razorpay.payments.all({ count: 50 });
+          const payments = await rzp.payments.all({ count: 50 });
           for (const pay of payments.items) {
               if ((pay.email === email || pay.contact === email) && pay.status === 'captured') {
                   foundValidPayment = true;
@@ -304,7 +521,7 @@ app.post('/api/restore-purchase', async (req, res) => {
                   razorpayId = pay.id;
                   // Infer plan from amount (paise)
                   const amount = Number(pay.amount);
-                  if (amount >= 225000) { planId = 'annual'; amountPaid = 2250; }
+                  if (amount >= 250000) { planId = 'annual'; amountPaid = 2500; }
                   else if (amount >= 125000) { planId = 'biannual'; amountPaid = 1250; }
                   else { planId = 'starter'; amountPaid = 250; }
                   
@@ -372,26 +589,39 @@ app.post('/api/restore-purchase', async (req, res) => {
 
 // Health check
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok' });
+  res.json({ 
+    status: 'ok',
+    vercel: !!process.env.VERCEL,
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Global Error Handler
+app.use((err: any, req: any, res: any, next: any) => {
+  console.error('[Global Error Handler]', err);
+  res.status(500).json({ 
+    error: 'Internal Server Error',
+    message: err.message,
+    path: req.path
+  });
 });
 
 // Vite Middleware (for Development)
 // We check if we are in production OR if dist exists and we want to serve it
 // Static File Serving Logic
 // We prioritize serving from 'dist' if it exists, as that is the production build.
-import fs from 'fs';
-
-const distPath = path.join(__dirname, 'dist');
+const distPath = path.join(process.cwd(), 'dist');
 const distExists = fs.existsSync(distPath);
 
 console.log(`[Server] Environment: ${process.env.NODE_ENV}`);
+console.log(`[Server] Vercel: ${!!process.env.VERCEL}`);
 console.log(`[Server] Dist Path: ${distPath}`);
 console.log(`[Server] Dist Exists: ${distExists}`);
 
 const isProduction = process.env.NODE_ENV === 'production' || process.env.npm_lifecycle_event === 'start';
 
 // Force production mode serving if dist exists AND we are in production mode
-if (distExists && isProduction) {
+if (distExists && isProduction && !process.env.VERCEL) {
   console.log('[Server] Serving static files from dist folder...');
   
   // Serve static assets
@@ -425,6 +655,8 @@ if (distExists && isProduction) {
           res.status(500).send('<h1>Application Error</h1><p>Failed to start development server. Please check logs.</p>');
       });
   }
+} else {
+  console.log('[Server] Running in Vercel Serverless mode. Static files served by Vercel.');
 }
 
 // Global Fallback for unmatched routes (should be caught by above logic, but just in case)
