@@ -113,14 +113,16 @@ app.use('/api/webhook/razorpay', bodyParser.raw({ type: 'application/json' }));
 app.use(bodyParser.json());
 
 // 4. Initialize Services Safely
-const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || 'https://senkiwubyxeozgvycwjo.supabase.co';
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNlbmtpd3VieXhlb3pndnljd2pvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU5NjQyNTMsImV4cCI6MjA4MTU0MDI1M30.97V4aCtU464P2rT6PQn57uUvDsuTpKbsF_vRW0R-3hQ';
+const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
 
 let supabase: any = null;
 try {
-  if (supabaseUrl && supabaseKey) {
+  if (supabaseUrl && supabaseKey && supabaseUrl.startsWith('http')) {
     supabase = createClient(supabaseUrl, supabaseKey);
     console.log('[Server] Supabase client initialized');
+  } else {
+    console.error('[Server] Supabase credentials missing or invalid URL!');
   }
 } catch (e) {
   console.error('[Server] Supabase Init Error:', e);
@@ -150,7 +152,12 @@ const getRazorpayInstance = () => {
     console.log(`[Server] Initializing Razorpay with Key ID: ${key_id.substring(0, 8)}... and Secret Prefix: ${key_secret.substring(0, 4)}... (Length: ${key_secret.length})`);
 
     // In ESM, the default export might be nested
-    const RazorpayConstructor = (Razorpay as any).default || Razorpay;
+    const RazorpayConstructor = (Razorpay as any)?.default || Razorpay;
+    
+    if (typeof RazorpayConstructor !== 'function') {
+        console.error('[Server] Razorpay constructor is not a function:', typeof RazorpayConstructor);
+        return null;
+    }
     
     try {
         const instance = new RazorpayConstructor({
@@ -161,8 +168,13 @@ const getRazorpayInstance = () => {
     } catch (constError) {
         console.error('[Server] Razorpay Constructor Error:', constError);
         // Fallback to direct new Razorpay if the above fails
-        // @ts-ignore
-        return new Razorpay({ key_id, key_secret });
+        try {
+            // @ts-ignore
+            return new Razorpay({ key_id, key_secret });
+        } catch (e2) {
+            console.error('[Server] Final Razorpay Fallback Failed:', e2);
+            return null;
+        }
     }
   } catch (e) {
     console.error('[Server] Razorpay Instance Creation Error:', e);
@@ -301,12 +313,12 @@ app.post('/api/create-subscription', async (req, res) => {
         key_id: process.env.RAZORPAY_KEY_ID
       });
     } catch (apiError: any) {
-      const errorDesc = apiError.error?.description || apiError.message;
+      const errorDesc = apiError.error?.description || apiError.message || 'Unknown Razorpay Error';
       const keyPrefix = (process.env.RAZORPAY_KEY_ID || 'MISSING').trim().substring(0, 8) + '...';
       console.warn(`[API] Razorpay Subscription API failed for plan ${planId} (${razorpayPlanId}) using key ${keyPrefix}. Error: ${errorDesc}`);
       
       // If the error is about invalid ID, definitely use fallback
-      if (errorDesc.includes('id provided does not exist') || errorDesc.includes('The id provided does not exist')) {
+      if (typeof errorDesc === 'string' && (errorDesc.includes('id provided does not exist') || errorDesc.includes('The id provided does not exist'))) {
           // If the user is trying to use their own plan ID, return an error instead of falling back to our links
           const configuredPlanIds = Object.values(PLAN_CONFIG).map(p => p.id).filter(Boolean);
           if (!configuredPlanIds.includes(razorpayPlanId)) {
@@ -319,7 +331,7 @@ app.post('/api/create-subscription', async (req, res) => {
       }
       
       // If authentication fails, it's likely a mismatch between keys and plan ID
-      if (errorDesc.includes('Authentication failed') || errorDesc.includes('Unauthorized')) {
+      if (typeof errorDesc === 'string' && (errorDesc.includes('Authentication failed') || errorDesc.includes('Unauthorized'))) {
           const configuredPlanIds = Object.values(PLAN_CONFIG).map(p => p.id).filter(Boolean);
           const isFallbackPlan = configuredPlanIds.includes(razorpayPlanId);
           const keyId = process.env.RAZORPAY_KEY_ID || 'MISSING';
@@ -351,7 +363,7 @@ app.post('/api/create-subscription', async (req, res) => {
     }
 
   } catch (error: any) {
-    console.error('Error creating subscription:', JSON.stringify(error, null, 2));
+    console.error('Error creating subscription:', error);
     const errorMessage = error.error?.description || error.message || 'Failed to create subscription';
     res.status(500).json({ error: errorMessage });
   }
@@ -394,7 +406,9 @@ app.post('/api/webhook/razorpay', async (req: any, res) => {
             }
 
             // 1. Upsert into 'subscriptions' table
-            const endDate = new Date(sub.current_end * 1000).toISOString();
+            const endDate = sub.current_end 
+                ? new Date(sub.current_end * 1000).toISOString() 
+                : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(); // Default to 30 days if missing
             const amountPaid = sub.item?.amount ? sub.item.amount / 100 : 0;
             
             const { error: subError } = await supabase
