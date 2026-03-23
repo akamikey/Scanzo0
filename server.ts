@@ -1,15 +1,16 @@
-import 'dotenv/config';
-import dotenv from 'dotenv';
-dotenv.config({ override: true });
 import express from 'express';
 import cors from 'cors';
-import bodyParser from 'body-parser';
-import Razorpay from 'razorpay';
-import crypto from 'crypto';
-import { createClient } from '@supabase/supabase-js';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import Razorpay from 'razorpay';
+import crypto from 'crypto';
 import fs from 'fs';
+import { createClient } from '@supabase/supabase-js';
+import dotenv from 'dotenv';
+import { GoogleGenAI } from "@google/genai";
+
+// Ensure .env variables take precedence
+dotenv.config({ override: true });
 
 console.log('[Server] Starting server initialization...');
 
@@ -18,6 +19,7 @@ const PORT = 3000;
 
 // 1. Basic Middleware
 app.use(cors());
+app.use(express.json());
 
 // 2. Diagnostics endpoint (Absolute top, no complex logic)
 app.get('/api/diagnostics', async (req, res) => {
@@ -97,8 +99,7 @@ app.get('/api/diagnostics', async (req, res) => {
 
 // 3. Body Parsing
 // Webhook route - needs raw body for signature verification
-app.use('/api/webhook/razorpay', bodyParser.raw({ type: 'application/json' }));
-app.use(bodyParser.json());
+app.use('/api/webhook/razorpay', express.raw({ type: 'application/json' }));
 
 // 4. Initialize Services Safely
 const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
@@ -116,44 +117,31 @@ try {
   console.error('[Server] Supabase Init Error:', e);
 }
 
-// Helper to get Razorpay instance with fresh environment variables
 const getRazorpayInstance = () => {
   try {
     let key_id = (process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID)?.trim();
     let key_secret = (process.env.RAZORPAY_KEY_SECRET || process.env.RAZORPAY_KEY_SECRETE || process.env.VITE_RAZORPAY_KEY_SECRET)?.trim();
 
     if (!key_id || !key_secret) {
-      console.warn('[Server] Razorpay keys missing in environment (Checked: RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, RAZORPAY_KEY_SECRETE)');
+      console.warn('[Server] Razorpay keys missing in environment');
       return null;
     }
 
     // Defensive: Strip rzp_live_ or rzp_test_ prefix from secret if user accidentally included it
-    // Most Razorpay secrets are 24 chars and don't have prefixes.
-    const originalSecret = key_secret;
     if (key_secret.startsWith('rzp_live_')) {
-        console.log('[Server] Stripping rzp_live_ prefix from Key Secret');
         key_secret = key_secret.replace('rzp_live_', '');
     } else if (key_secret.startsWith('rzp_test_')) {
-        console.log('[Server] Stripping rzp_test_ prefix from Key Secret');
         key_secret = key_secret.replace('rzp_test_', '');
     }
 
-    if (key_secret.length < 20) {
-        console.error(`[Server] CRITICAL: Razorpay Key Secret is too short (${key_secret.length} chars). It should be 24 characters.`);
-        if (key_secret === 'scanzo123') {
-            console.error(`[Server] HINT: You have put your WEBHOOK SECRET ('scanzo123') into the KEY SECRET field. Please put your actual Key Secret (24 chars) there instead.`);
-        }
+    // Handle different import styles for Razorpay
+    const RazorpayConstructor: any = (Razorpay as any).default || Razorpay;
+    
+    if (typeof RazorpayConstructor !== 'function') {
+        console.error('[Razorpay] Constructor is not a function. Type:', typeof RazorpayConstructor);
+        return null;
     }
 
-    const maskedSecret = `${key_secret.substring(0, 3)}***${key_secret.substring(key_secret.length - 3)}`;
-    console.log(`[Server] Initializing Razorpay Instance:
-- Key ID: ${key_id.substring(0, 8)}...
-- Secret: ${maskedSecret} (Length: ${key_secret.length})`);
-
-    // In ESM, the default export might be nested
-    const RazorpayConstructor = (Razorpay as any)?.default || Razorpay;
-    
-    // Direct initialization like in test_auth.ts
     const instance = new RazorpayConstructor({
       key_id: key_id,
       key_secret: key_secret,
@@ -285,20 +273,16 @@ app.post('/api/create-subscription', async (req, res) => {
     }
 
     const keyId = (process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID || 'MISSING').trim();
-    console.log(`[API] Creating subscription for user ${userId} with plan ${razorpayPlanId} using Key ID: ${keyId.substring(0, 8)}...`);
-
     try {
-      // Create Subscription
-      // Adding start_at (1 minute in future) can sometimes resolve "payment not allowed" errors
-      // and ensures the subscription is ready for the first payment.
-      const startAt = Math.floor(Date.now() / 1000) + 60;
+      console.log(`[API] Creating subscription for user ${userId} with plan ${razorpayPlanId} using Key ID: ${keyId.substring(0, 8)}...`);
+      console.log(`[API] Params: plan_id=${razorpayPlanId}, total_count=${planConfig.total_count}, quantity=1, customer_notify=1`);
 
       const subscription = await rzp.subscriptions.create({
         plan_id: razorpayPlanId,
         total_count: planConfig.total_count,
         quantity: 1,
         customer_notify: 1,
-        start_at: startAt,
+        // Removed start_at to see if it resolves 500 error
         notes: {
           user_id: userId,
           internal_plan_id: planId
@@ -311,11 +295,12 @@ app.post('/api/create-subscription', async (req, res) => {
         id: subscription.id,
         short_url: subscription.short_url,
         status: subscription.status,
-        key_id: process.env.RAZORPAY_KEY_ID
+        key_id: process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID
       });
     } catch (apiError: any) {
+      console.error('[API] Razorpay Subscription API Error:', apiError);
       const errorDesc = apiError.error?.description || apiError.message || 'Unknown Razorpay Error';
-      const keyPrefix = (process.env.RAZORPAY_KEY_ID || 'MISSING').trim().substring(0, 8) + '...';
+      const keyPrefix = (process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID || 'MISSING').trim().substring(0, 8) + '...';
       console.warn(`[API] Razorpay Subscription API failed for plan ${planId} (${razorpayPlanId}) using key ${keyPrefix}. Error: ${errorDesc}`);
       
       // If the error is about invalid ID, definitely use fallback

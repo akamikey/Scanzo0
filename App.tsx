@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { HashRouter as Router, Routes, Route, useLocation, Link, useNavigate, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useLocation, Link, useNavigate, Navigate } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import Dashboard from './pages/Dashboard';
@@ -170,8 +170,18 @@ const Layout = () => {
     );
   }
 
-  // If it's the landing page or a public route, render it without the dashboard layout
-  if (isLandingPage || isPublicRoute) {
+  // If it's a public route, render it without any dashboard layout or auth checks
+  if (isPublicRoute) {
+     return (
+        <>
+           <ScrollToTop />
+           <AnimatedRoutes />
+        </>
+     );
+  }
+
+  // If it's the landing page, render it without the dashboard layout
+  if (isLandingPage) {
      // Redirect logged-in users from landing page to dashboard
      if (user && location.pathname === '/') {
         return <Navigate to="/dashboard" replace />;

@@ -82,7 +82,7 @@ const QrCodePage: React.FC = () => {
   const publicSlug = ownerData?.public_slug || 'demo-business';
   const businessName = ownerData?.business_name || 'Our Business';
   
-  const publicLink = `${window.location.origin}/#/scan/${publicSlug}`;
+  const publicLink = `${window.location.origin}/scan/${publicSlug}`;
   const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=1000x1000&data=${encodeURIComponent(publicLink)}`;
 
   const handleSimulateScan = () => {

@@ -495,6 +495,48 @@ const SubscribePage: React.FC = () => {
                             )}
                         </button>
                       )}
+
+                      {/* Detailed Error Display */}
+                      {errorDetails && processingId === plan.id && (
+                        <motion.div 
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="mt-6 p-5 rounded-3xl bg-red-50 dark:bg-red-900/20 border-2 border-red-100 dark:border-red-500/20 space-y-3 shadow-xl shadow-red-500/5"
+                        >
+                          <div className="flex items-start gap-3">
+                            <div className="p-2 bg-red-100 dark:bg-red-500/20 rounded-xl text-red-600 dark:text-red-400">
+                              <AlertCircle size={20} />
+                            </div>
+                            <div className="flex-1">
+                              <h4 className="text-sm font-black text-red-700 dark:text-red-300 uppercase tracking-wider">Payment Error</h4>
+                              <p className="text-sm font-bold text-red-600 dark:text-red-400/90 mt-1 leading-relaxed">
+                                {errorDetails.message}
+                              </p>
+                            </div>
+                          </div>
+
+                          {errorDetails.details && (
+                            <div className="pl-11">
+                              <p className="text-[11px] font-bold text-red-500/70 dark:text-red-400/50 uppercase tracking-widest mb-1">Error Details</p>
+                              <code className="block p-2 bg-white/50 dark:bg-black/20 rounded-lg text-[10px] font-mono text-red-800 dark:text-red-200 break-all border border-red-100/50 dark:border-red-500/10">
+                                {errorDetails.details}
+                              </code>
+                            </div>
+                          )}
+
+                          {errorDetails.help && (
+                            <div className="pl-11 pt-2 border-t border-red-200/50 dark:border-red-500/10">
+                              <div className="flex items-center gap-2 mb-1">
+                                <Sparkles size={14} className="text-blue-500" />
+                                <span className="text-[11px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest">Pro Tip</span>
+                              </div>
+                              <p className="text-xs font-bold text-slate-600 dark:text-slate-300 leading-relaxed italic">
+                                {errorDetails.help}
+                              </p>
+                            </div>
+                          )}
+                        </motion.div>
+                      )}
                   </div>
                 </GlassCard>
               </motion.div>
