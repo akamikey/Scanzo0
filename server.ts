@@ -1,3 +1,6 @@
+import 'dotenv/config';
+import dotenv from 'dotenv';
+dotenv.config({ override: true });
 import express from 'express';
 import cors from 'cors';
 import bodyParser from 'body-parser';
@@ -7,7 +10,6 @@ import { createClient } from '@supabase/supabase-js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
-import 'dotenv/config';
 
 console.log('[Server] Starting server initialization...');
 
@@ -48,33 +50,19 @@ app.get('/api/diagnostics', async (req, res) => {
             try {
                 const axios = (await import('axios')).default;
                 
-                // Try without prefix
-                const secretNoPrefix = keySecret.replace('rzp_live_', '').replace('rzp_test_', '');
-                const authHeaderNoPrefix = `Basic ${Buffer.from(`${keyId}:${secretNoPrefix}`).toString('base64')}`;
+                // Try exactly what test_auth.ts does
+                const authHeader = `Basic ${Buffer.from(`${keyId}:${keySecret}`).toString('base64')}`;
                 
                 try {
-                    await axios.get('https://api.razorpay.com/v1/plans?count=1', {
-                        headers: { 'Authorization': authHeaderNoPrefix }
+                    const axiosRes = await axios.get('https://api.razorpay.com/v1/plans?count=1', {
+                        headers: { 'Authorization': authHeader }
                     });
-                    console.log('[Diagnostics] Manual axios check SUCCEEDED WITHOUT prefix.');
-                    razorpayStatus = 'authenticated_manual_no_prefix';
-                } catch (errNoPrefix) {
-                    console.warn('[Diagnostics] Manual axios check FAILED WITHOUT prefix.');
-                    
-                    // Try WITH prefix
-                    const authHeaderWithPrefix = `Basic ${Buffer.from(`${keyId}:${keySecret}`).toString('base64')}`;
-                    try {
-                        await axios.get('https://api.razorpay.com/v1/plans?count=1', {
-                            headers: { 'Authorization': authHeaderWithPrefix }
-                        });
-                        console.log('[Diagnostics] Manual axios check SUCCEEDED WITH prefix.');
-                        razorpayStatus = 'authenticated_manual_with_prefix';
-                    } catch (errWithPrefix: any) {
-                        console.error('[Diagnostics] Manual axios check also FAILED WITH prefix:', errWithPrefix.response?.data?.error?.description || errWithPrefix.message);
-                        if (razorpayError.includes('Authentication failed')) {
-                            razorpayError += ' (Check if your Key ID and Secret match exactly what is in your Razorpay dashboard. Ensure you are using LIVE keys for LIVE plans.)';
-                        }
-                    }
+                    console.log('[Diagnostics] Manual axios check SUCCEEDED.');
+                    razorpayStatus = 'authenticated_manual_success';
+                } catch (errManual: any) {
+                    console.error('[Diagnostics] Manual axios check FAILED:', errManual.response?.data?.error?.description || errManual.message);
+                    razorpayStatus = 'failed_manual';
+                    razorpayError += ` (Manual check also failed: ${errManual.response?.data?.error?.description || errManual.message})`;
                 }
             } catch (axiosErr: any) {
                 console.error('[Diagnostics] Manual axios check error:', axiosErr.message);
@@ -131,16 +119,17 @@ try {
 // Helper to get Razorpay instance with fresh environment variables
 const getRazorpayInstance = () => {
   try {
-    let key_id = process.env.RAZORPAY_KEY_ID?.trim();
-    let key_secret = process.env.RAZORPAY_KEY_SECRET?.trim();
+    let key_id = (process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID)?.trim();
+    let key_secret = (process.env.RAZORPAY_KEY_SECRET || process.env.RAZORPAY_KEY_SECRETE || process.env.VITE_RAZORPAY_KEY_SECRET)?.trim();
 
     if (!key_id || !key_secret) {
-      console.warn('[Server] Razorpay keys missing in environment');
+      console.warn('[Server] Razorpay keys missing in environment (Checked: RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, RAZORPAY_KEY_SECRETE)');
       return null;
     }
 
     // Defensive: Strip rzp_live_ or rzp_test_ prefix from secret if user accidentally included it
     // Most Razorpay secrets are 24 chars and don't have prefixes.
+    const originalSecret = key_secret;
     if (key_secret.startsWith('rzp_live_')) {
         console.log('[Server] Stripping rzp_live_ prefix from Key Secret');
         key_secret = key_secret.replace('rzp_live_', '');
@@ -149,46 +138,58 @@ const getRazorpayInstance = () => {
         key_secret = key_secret.replace('rzp_test_', '');
     }
 
-    console.log(`[Server] Initializing Razorpay with Key ID: ${key_id.substring(0, 8)}... and Secret Prefix: ${key_secret.substring(0, 4)}... (Length: ${key_secret.length})`);
+    if (key_secret.length < 20) {
+        console.error(`[Server] CRITICAL: Razorpay Key Secret is too short (${key_secret.length} chars). It should be 24 characters.`);
+        if (key_secret === 'scanzo123') {
+            console.error(`[Server] HINT: You have put your WEBHOOK SECRET ('scanzo123') into the KEY SECRET field. Please put your actual Key Secret (24 chars) there instead.`);
+        }
+    }
+
+    const maskedSecret = `${key_secret.substring(0, 3)}***${key_secret.substring(key_secret.length - 3)}`;
+    console.log(`[Server] Initializing Razorpay Instance:
+- Key ID: ${key_id.substring(0, 8)}...
+- Secret: ${maskedSecret} (Length: ${key_secret.length})`);
 
     // In ESM, the default export might be nested
     const RazorpayConstructor = (Razorpay as any)?.default || Razorpay;
     
-    if (typeof RazorpayConstructor !== 'function') {
-        console.error('[Server] Razorpay constructor is not a function:', typeof RazorpayConstructor);
-        return null;
-    }
+    // Direct initialization like in test_auth.ts
+    const instance = new RazorpayConstructor({
+      key_id: key_id,
+      key_secret: key_secret,
+    });
     
-    try {
-        const instance = new RazorpayConstructor({
-          key_id,
-          key_secret,
-        });
-        return instance;
-    } catch (constError) {
-        console.error('[Server] Razorpay Constructor Error:', constError);
-        // Fallback to direct new Razorpay if the above fails
-        try {
-            // @ts-ignore
-            return new Razorpay({ key_id, key_secret });
-        } catch (e2) {
-            console.error('[Server] Final Razorpay Fallback Failed:', e2);
-            return null;
-        }
-    }
+    return instance;
   } catch (e) {
     console.error('[Server] Razorpay Instance Creation Error:', e);
     return null;
   }
 };
 
-// Initial check
-const initialRzp = getRazorpayInstance();
-if (initialRzp) {
-    console.log(`[Server] Razorpay initialized with Key ID: ${process.env.RAZORPAY_KEY_ID?.substring(0, 8)}...`);
-} else {
-    console.warn(`[Server] Razorpay keys missing or invalid in environment.`);
-}
+let startupTestResult = { status: 'not_run', error: null as string | null };
+
+// Initial check and startup test
+const runStartupTest = async () => {
+    const rzp = getRazorpayInstance();
+    if (rzp) {
+        console.log(`[Server] Razorpay instance created. Testing authentication...`);
+        try {
+            const plans = await rzp.plans.all({ count: 1 });
+            console.log(`[Server] Razorpay Startup Test: SUCCESS! Found ${plans.items.length} plans.`);
+            startupTestResult = { status: 'success', error: null };
+        } catch (err: any) {
+            const errorDesc = err.error?.description || err.message || 'Unknown Error';
+            console.error(`[Server] Razorpay Startup Test: FAILED! Error: ${errorDesc}`);
+            console.error(`[Server] Please verify your RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in the Settings menu.`);
+            startupTestResult = { status: 'failed', error: errorDesc };
+        }
+    } else {
+        console.warn(`[Server] Razorpay keys missing or invalid in environment. Startup test skipped.`);
+        startupTestResult = { status: 'missing_keys', error: 'Keys missing or invalid' };
+    }
+};
+
+runStartupTest();
 
 // API Routes
 
@@ -283,7 +284,8 @@ app.post('/api/create-subscription', async (req, res) => {
         return returnFallback();
     }
 
-    console.log(`[API] Creating subscription for user ${userId} with plan ${razorpayPlanId} using Key ID: ${process.env.RAZORPAY_KEY_ID?.substring(0, 8)}...`);
+    const keyId = (process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID || 'MISSING').trim();
+    console.log(`[API] Creating subscription for user ${userId} with plan ${razorpayPlanId} using Key ID: ${keyId.substring(0, 8)}...`);
 
     try {
       // Create Subscription
@@ -297,7 +299,6 @@ app.post('/api/create-subscription', async (req, res) => {
         quantity: 1,
         customer_notify: 1,
         start_at: startAt,
-        addons: [],
         notes: {
           user_id: userId,
           internal_plan_id: planId
