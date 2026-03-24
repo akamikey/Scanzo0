@@ -40,6 +40,7 @@ declare global {
   interface Window {
     Razorpay: any;
   }
+  var Razorpay: any;
 }
 
 import Footer from '../components/Footer';
@@ -116,16 +117,6 @@ const SubscribePage: React.FC = () => {
     setPaymentStatus('cancelled');
   };
 
-  const loadRazorpay = () => {
-    return new Promise((resolve) => {
-      const script = document.createElement('script');
-      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-      script.onload = () => resolve(true);
-      script.onerror = () => resolve(false);
-      document.body.appendChild(script);
-    });
-  };
-
   const handlePayment = async (plan: typeof PLANS[0]) => {
     if (!user) {
         alert("Please sign in to subscribe.");
@@ -135,111 +126,43 @@ const SubscribePage: React.FC = () => {
     setProcessingId(plan.id);
     setPaymentStatus('idle');
 
-    const fetchWithRetry = async (url: string, options: RequestInit, retries = 3): Promise<Response> => {
-        try {
-            const response = await fetch(url, options);
-            return response;
-        } catch (error: any) {
-            if (retries > 0 && error.message?.includes('Failed to fetch')) {
-                console.debug(`Retrying fetch to ${url} (${3 - retries + 1}/3)...`);
-                await new Promise(resolve => setTimeout(resolve, 1000));
-                return fetchWithRetry(url, options, retries - 1);
-            }
-            throw error;
-        }
-    };
+    if (typeof Razorpay === 'undefined') {
+        alert('Razorpay SDK failed to load. Are you online?');
+        setProcessingId(null);
+        return;
+    }
 
     try {
-        const res = await loadRazorpay();
-        if (!res) {
-            alert('Razorpay SDK failed to load. Are you online?');
+      const options = {
+        key: "rzp_live_STxlKmH3jUfhCg",
+        subscription_id: null,
+        subscription: true,
+        plan_id: plan.planId,
+        name: "Scanzo",
+        description: "Subscription",
+        handler: function (response: any) {
+          navigate(`/subscribe?razorpay_payment_id=${response.razorpay_payment_id}&plan=${plan.id}`, { replace: true });
+        },
+        prefill: {
+          email: user.email,
+        },
+        theme: {
+          color: "#3399cc"
+        },
+        modal: {
+          ondismiss: function() {
             setProcessingId(null);
-            return;
+            navigate(`/subscribe?cancelled=true&plan=${plan.id}`, { replace: true });
+          }
         }
+      };
 
-        const response = await fetchWithRetry('/api/create-subscription', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                planId: plan.id,
-                userId: user.id
-            }),
-        });
-
-        let data;
-        const responseText = await response.text();
-        try {
-            data = JSON.parse(responseText);
-        } catch (e) {
-            console.error('Server returned non-JSON response:', responseText);
-            throw new Error(`Server Error (${response.status}): ${responseText.slice(0, 100)}...`);
-        }
-
-        if (!response.ok) {
-            let helpText = data.help;
-            if (data.error?.includes('Customer payment is not allowed')) {
-                helpText = "This usually means the subscription is already active or your Razorpay account is not fully configured for Subscriptions. Please ensure 'Subscriptions' are enabled in your Razorpay dashboard and you are using LIVE keys for LIVE plans.";
-            }
-            setErrorDetails({
-                message: data.error || 'Failed to create subscription',
-                details: data.details,
-                help: helpText
-            });
-            throw new Error(data.error || 'Failed to create subscription');
-        }
-
-        // Handle redirect flow (fallback links)
-        if (data.is_fallback || !data.key_id) {
-            if (data.short_url) {
-                // Directly redirect to the payment page to avoid intermediate step
-                window.location.href = data.short_url;
-                return;
-            } else {
-                throw new Error('No payment URL received');
-            }
-        }
-
-        // Handle modal flow
-        const options = {
-            key: data.key_id,
-            subscription_id: data.id,
-            name: "Scanzo",
-            description: `${plan.name} Subscription`,
-            handler: function (response: any) {
-                // Redirect to self with success params to trigger animation
-                navigate(`/subscribe?razorpay_payment_id=${response.razorpay_payment_id}&plan=${plan.id}`, { replace: true });
-            },
-            prefill: {
-                email: user.email,
-            },
-            theme: {
-                color: "#3B82F6"
-            },
-            modal: {
-                ondismiss: function() {
-                    setProcessingId(null);
-                    // If they closed it, we can show the cancelled state if we want, 
-                    // but usually ondismiss is just a quiet close.
-                    // The prompt says "If the user clicked a plan but returned without completing payment"
-                    navigate(`/subscribe?cancelled=true&plan=${plan.id}`, { replace: true });
-                }
-            }
-        };
-
-        const rzp = new window.Razorpay(options);
-        rzp.open();
-
+      const rzp = new Razorpay(options);
+      rzp.open();
     } catch (error: any) {
-        console.error('Payment error:', error);
-        // If we didn't already set errorDetails, set a generic one
-        if (!errorDetails) {
-            setErrorDetails({ message: error.message || 'Unknown error' });
-        }
-        setPaymentStatus('cancelled');
-        setActivePlanId(plan.id);
-        setProcessingId(null);
+      console.error('Payment error:', error);
+      alert("Payment failed to open.");
+      setProcessingId(null);
     }
   };
 

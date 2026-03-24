@@ -108,14 +108,29 @@ const PublicReviewPage: React.FC = () => {
           .on(
             'postgres_changes',
             {
-              event: 'UPDATE',
+              event: 'INSERT',
               schema: 'public',
-              table: 'businesses',
+              table: 'subscriptions',
               filter: `owner_id=eq.${ownerId}`
             },
             (payload) => {
-              const newStatus = payload.new.subscription_status;
-              setIsExpired(newStatus !== 'active');
+              const newStatus = payload.new.status;
+              const endDate = new Date(payload.new.current_period_end);
+              setIsExpired(!(newStatus === 'active' && endDate > new Date()));
+            }
+          )
+          .on(
+            'postgres_changes',
+            {
+              event: 'UPDATE',
+              schema: 'public',
+              table: 'subscriptions',
+              filter: `owner_id=eq.${ownerId}`
+            },
+            (payload) => {
+              const newStatus = payload.new.status;
+              const endDate = new Date(payload.new.current_period_end);
+              setIsExpired(!(newStatus === 'active' && endDate > new Date()));
             }
           )
           .subscribe();
@@ -141,7 +156,7 @@ const PublicReviewPage: React.FC = () => {
         // Fetch by business ID
         const { data: bizData, error: bizError } = await supabase
           .from('businesses')
-          .select('id, owner_id, review_link, website_link, subscription_status')
+          .select('id, owner_id, review_link, website_link')
           .eq('id', targetId)
           .maybeSingle();
 
@@ -157,7 +172,23 @@ const PublicReviewPage: React.FC = () => {
           setLinks(bizData);
           setBusinessId(bizData.id);
           setOwnerId(bizData.owner_id);
-          setIsExpired(bizData.subscription_status !== 'active');
+
+          const { data: subData } = await supabase
+            .from('subscriptions')
+            .select('status, current_period_end')
+            .eq('owner_id', bizData.owner_id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          let isSubActive = false;
+          if (subData) {
+            const endDate = new Date(subData.current_period_end);
+            if (subData.status === 'active' && endDate > new Date()) {
+              isSubActive = true;
+            }
+          }
+          setIsExpired(!isSubActive);
 
           // Fetch owner for business name and slug
           const { data: owner, error: ownerError } = await supabase
@@ -195,7 +226,7 @@ const PublicReviewPage: React.FC = () => {
           
           const { data: bizData, error: linkError } = await supabase
             .from('businesses')
-            .select('id, review_link, website_link, subscription_status')
+            .select('id, review_link, website_link')
             .eq('owner_id', owner.id)
             .maybeSingle();
             
@@ -204,7 +235,23 @@ const PublicReviewPage: React.FC = () => {
           if (bizData) {
             setLinks(bizData);
             setBusinessId(bizData.id);
-            setIsExpired(bizData.subscription_status !== 'active');
+            
+            const { data: subData } = await supabase
+              .from('subscriptions')
+              .select('status, current_period_end')
+              .eq('owner_id', owner.id)
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .maybeSingle();
+
+            let isSubActive = false;
+            if (subData) {
+              const endDate = new Date(subData.current_period_end);
+              if (subData.status === 'active' && endDate > new Date()) {
+                isSubActive = true;
+              }
+            }
+            setIsExpired(!isSubActive);
           }
         }
       }
@@ -298,15 +345,20 @@ const PublicReviewPage: React.FC = () => {
     );
   }
 
+  if (isExpired) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-black p-6 text-center">
+        <div className="w-20 h-20 bg-amber-100 dark:bg-amber-900/20 text-amber-500 rounded-full flex items-center justify-center mb-6">
+          <AlertCircle size={40} />
+        </div>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Subscription Inactive</h1>
+        <p className="text-gray-500 max-w-xs">This business subscription is inactive. Please contact owner.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#F2F2F7] dark:bg-slate-950 flex flex-col items-center justify-center p-6 font-sans">
-      {/* Inactive Banner */}
-      {isExpired && (
-        <div className="fixed top-0 left-0 right-0 bg-amber-500 text-white py-3 px-6 text-center font-bold z-[100] shadow-lg flex items-center justify-center gap-2 text-sm">
-          <AlertCircle size={18} />
-          <span>Business Inactive - Reviews Temporarily Disabled</span>
-        </div>
-      )}
       
       <AnimatePresence>
         {step === 'success' && (
@@ -318,29 +370,14 @@ const PublicReviewPage: React.FC = () => {
         )}
       </AnimatePresence>
 
-      <div className={`w-full max-w-md bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl shadow-blue-500/10 p-8 md:p-10 border border-white/40 dark:border-white/5 backdrop-blur-sm ${isExpired ? 'opacity-75 pointer-events-none grayscale' : ''}`}>
+      <div className={`w-full max-w-md bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl shadow-blue-500/10 p-8 md:p-10 border border-white/40 dark:border-white/5 backdrop-blur-sm`}>
         <div className="text-center mb-10">
           <h1 className="text-2xl font-black text-slate-800 dark:text-white tracking-tight mb-2">{businessName}</h1>
           <div className="h-1 w-12 bg-blue-500 mx-auto rounded-full" />
         </div>
 
-        {isExpired ? (
-          <div className="text-center space-y-4 py-8">
-            <div className="w-16 h-16 bg-amber-100 dark:bg-amber-900/20 text-amber-500 rounded-full flex items-center justify-center mx-auto">
-              <AlertCircle size={32} />
-            </div>
-            <h2 className="text-xl font-bold text-slate-700 dark:text-white">Reviews Disabled</h2>
-            <p className="text-slate-500 dark:text-slate-400">This business is currently inactive. Please check back later.</p>
-            <button 
-              onClick={() => window.location.href = `/b/${slug}`}
-              className="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold mt-4 pointer-events-auto"
-            >
-              View Business Profile
-            </button>
-          </div>
-        ) : (
-          <>
-            {step === 'rating' && (
+        <>
+          {step === 'rating' && (
               <div className="space-y-8 text-center">
                 <h2 className="text-xl font-bold text-slate-700 dark:text-white">How was your experience?</h2>
                 <div className="flex justify-center gap-2">
@@ -420,7 +457,6 @@ const PublicReviewPage: React.FC = () => {
               </form>
             )}
           </>
-        )}
       </div>
 
       {/* Footer */}

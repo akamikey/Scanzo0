@@ -36,7 +36,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ isDark, toggleTheme }) => {
   return (
     <div className="min-h-screen bg-white dark:bg-slate-950 font-sans text-slate-900 dark:text-white overflow-x-hidden flex flex-col">
       
-      <PublicNavbar isDark={isDark} toggleTheme={toggleTheme} />
+      <PublicNavbar />
 
       {/* Hero Section - Modern Startup Style */}
       <section className="relative pt-32 pb-24 overflow-hidden">

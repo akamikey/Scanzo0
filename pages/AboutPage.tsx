@@ -14,7 +14,7 @@ interface AboutPageProps {
 const AboutPage: React.FC<AboutPageProps> = ({ isDark, toggleTheme }) => {
   return (
     <div className="min-h-screen bg-white dark:bg-slate-900 font-sans text-slate-900 dark:text-white overflow-x-hidden">
-      <PublicNavbar isDark={isDark} toggleTheme={toggleTheme} />
+      <PublicNavbar />
       
       <section className="pt-32 pb-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto text-center relative min-h-[80vh] flex flex-col justify-center">
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-blue-500/10 rounded-full blur-[120px] -z-10" />

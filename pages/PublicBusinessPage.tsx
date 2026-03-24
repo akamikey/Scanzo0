@@ -76,14 +76,29 @@ const PublicBusinessPage: React.FC = () => {
             .on(
               'postgres_changes',
               {
-                event: 'UPDATE',
+                event: 'INSERT',
                 schema: 'public',
-                table: 'businesses',
+                table: 'subscriptions',
                 filter: `owner_id=eq.${page.owner_id}`
               },
               (payload) => {
-                const newStatus = payload.new.subscription_status;
-                setIsExpired(newStatus !== 'active');
+                const newStatus = payload.new.status;
+                const endDate = new Date(payload.new.current_period_end);
+                setIsExpired(!(newStatus === 'active' && endDate > new Date()));
+              }
+            )
+            .on(
+              'postgres_changes',
+              {
+                event: 'UPDATE',
+                schema: 'public',
+                table: 'subscriptions',
+                filter: `owner_id=eq.${page.owner_id}`
+              },
+              (payload) => {
+                const newStatus = payload.new.status;
+                const endDate = new Date(payload.new.current_period_end);
+                setIsExpired(!(newStatus === 'active' && endDate > new Date()));
               }
             )
             .subscribe();
@@ -119,7 +134,7 @@ const PublicBusinessPage: React.FC = () => {
       // 2. Check Subscription
       const { data: bizData } = await supabase
         .from('businesses')
-        .select('review_link, website_link, subscription_status')
+        .select('review_link, website_link')
         .eq('owner_id', pageData.owner_id)
         .maybeSingle();
 
@@ -128,8 +143,24 @@ const PublicBusinessPage: React.FC = () => {
           website_link: bizData.website_link,
           google_link: bizData.review_link
         });
-        setIsExpired(bizData.subscription_status !== 'active');
       }
+
+      const { data: subData } = await supabase
+        .from('subscriptions')
+        .select('status, current_period_end')
+        .eq('owner_id', pageData.owner_id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      let isSubActive = false;
+      if (subData) {
+        const endDate = new Date(subData.current_period_end);
+        if (subData.status === 'active' && endDate > new Date()) {
+          isSubActive = true;
+        }
+      }
+      setIsExpired(!isSubActive);
 
       // 3. Fetch Services (Try-catch for optional tables)
       try {
@@ -188,17 +219,22 @@ const PublicBusinessPage: React.FC = () => {
     );
   }
 
+  if (isExpired) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-black p-6 text-center">
+        <div className="w-20 h-20 bg-amber-100 dark:bg-amber-900/20 text-amber-500 rounded-full flex items-center justify-center mb-6">
+          <AlertCircle size={40} />
+        </div>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Subscription Inactive</h1>
+        <p className="text-gray-500 max-w-xs">This business subscription is inactive. Please contact owner.</p>
+      </div>
+    );
+  }
+
   const themeColor = page.theme_color || '#3b82f6';
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black pb-20">
-      {/* Inactive Banner */}
-      {isExpired && (
-        <div className="bg-amber-500 text-white py-3 px-6 text-center font-bold sticky top-0 z-[100] shadow-lg flex items-center justify-center gap-2">
-          <AlertCircle size={20} />
-          <span>Business Subscription Inactive - Explore & Reviews are temporarily disabled</span>
-        </div>
-      )}
       
       {/* Hero Section */}
       <div className="relative h-64 md:h-80 w-full overflow-hidden">
