@@ -81,7 +81,7 @@ const SuccessOverlay: React.FC<{ rating: number, reviewLink?: string, isFeedback
 };
 
 const PublicReviewPage: React.FC = () => {
-  const { slug } = useParams<{ slug: string }>();
+  const { slug: urlSlug, businessId: urlBusinessId } = useParams<{ slug?: string, businessId?: string }>();
   const [loading, setLoading] = useState(true);
   const [links, setLinks] = useState<{ review_link?: string, website_link?: string, owner_id?: string, id?: string } | null>(null);
   const [businessName, setBusinessName] = useState('');
@@ -94,76 +94,106 @@ const PublicReviewPage: React.FC = () => {
 
   const [ownerId, setOwnerId] = useState<string | null>(null);
   const [businessId, setBusinessId] = useState<string | null>(null);
+  const [slug, setSlug] = useState<string | null>(null);
 
   const [isExpired, setIsExpired] = useState(false);
 
   useEffect(() => {
     let subscriptionChannel: any = null;
 
-    if (slug) {
-      fetchLinks().then(() => {
-        if (ownerId) {
-          subscriptionChannel = supabase
-            .channel(`review-public-${ownerId}`)
-            .on(
-              'postgres_changes',
-              {
-                event: 'UPDATE',
-                schema: 'public',
-                table: 'businesses',
-                filter: `owner_id=eq.${ownerId}`
-              },
-              (payload) => {
-                const newStatus = payload.new.subscription_status;
-                setIsExpired(newStatus !== 'active');
-              }
-            )
-            .subscribe();
-        }
-      });
-    }
+    fetchLinks().then(() => {
+      if (ownerId) {
+        subscriptionChannel = supabase
+          .channel(`review-public-${ownerId}`)
+          .on(
+            'postgres_changes',
+            {
+              event: 'UPDATE',
+              schema: 'public',
+              table: 'businesses',
+              filter: `owner_id=eq.${ownerId}`
+            },
+            (payload) => {
+              const newStatus = payload.new.subscription_status;
+              setIsExpired(newStatus !== 'active');
+            }
+          )
+          .subscribe();
+      }
+    });
 
     return () => {
       if (subscriptionChannel) {
         supabase.removeChannel(subscriptionChannel);
       }
     };
-  }, [slug, ownerId]);
+  }, [urlSlug, urlBusinessId, ownerId]);
 
   const fetchLinks = async () => {
-    if (!slug) {
+    if (!urlSlug && !urlBusinessId) {
       setLoading(false);
       return;
     }
     
     try {
-      const { data: owner, error: ownerError } = await supabase
-        .from('owners')
-        .select('id, business_name')
-        .eq('public_slug', slug)
-        .maybeSingle();
-
-      if (ownerError) throw ownerError;
-
-      if (owner) {
-        setBusinessName(owner.business_name);
-        setOwnerId(owner.id);
-        
-        const { data: bizData, error: linkError } = await supabase
+      if (urlBusinessId) {
+        // Fetch by business ID
+        const { data: bizData, error: bizError } = await supabase
           .from('businesses')
-          .select('id, review_link, website_link, subscription_status')
-          .eq('owner_id', owner.id)
+          .select('id, owner_id, review_link, website_link, subscription_status')
+          .eq('id', urlBusinessId)
           .maybeSingle();
-          
-        if (linkError) throw linkError;
+
+        if (bizError) throw bizError;
 
         if (bizData) {
           setLinks(bizData);
           setBusinessId(bizData.id);
+          setOwnerId(bizData.owner_id);
           setIsExpired(bizData.subscription_status !== 'active');
+
+          // Fetch owner for business name and slug
+          const { data: owner, error: ownerError } = await supabase
+            .from('owners')
+            .select('business_name, public_slug')
+            .eq('id', bizData.owner_id)
+            .maybeSingle();
+
+          if (ownerError) throw ownerError;
+          if (owner) {
+            setBusinessName(owner.business_name);
+            setSlug(owner.public_slug);
+          }
         }
-      } else {
-        console.warn("No owner found for slug:", slug);
+      } else if (urlSlug) {
+        // Existing slug logic
+        const { data: owner, error: ownerError } = await supabase
+          .from('owners')
+          .select('id, business_name, public_slug')
+          .eq('public_slug', urlSlug)
+          .maybeSingle();
+
+        if (ownerError) throw ownerError;
+
+        if (owner) {
+          setBusinessName(owner.business_name);
+          setOwnerId(owner.id);
+          setSlug(owner.public_slug);
+          
+          const { data: bizData, error: linkError } = await supabase
+            .from('businesses')
+            .select('id, review_link, website_link, subscription_status')
+            .eq('owner_id', owner.id)
+            .maybeSingle();
+            
+          if (linkError) throw linkError;
+
+          if (bizData) {
+            setLinks(bizData);
+            setBusinessId(bizData.id);
+            setIsExpired(bizData.subscription_status !== 'active');
+          }
+        }
       }
     } catch (err) {
       console.error("Error fetching public review links:", err);
@@ -289,7 +319,7 @@ const PublicReviewPage: React.FC = () => {
             <h2 className="text-xl font-bold text-slate-700">Reviews Disabled</h2>
             <p className="text-slate-500">This business is currently inactive. Please check back later.</p>
             <button 
-              onClick={() => window.location.href = `/#/b/${slug}`}
+              onClick={() => window.location.href = `/b/${slug}`}
               className="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold mt-4 pointer-events-auto"
             >
               View Business Profile

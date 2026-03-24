@@ -86,7 +86,7 @@ const QrCodePage: React.FC = () => {
   const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=1000x1000&data=${encodeURIComponent(publicLink)}`;
 
   const handleSimulateScan = () => {
-    window.open(`/#/scan/${publicSlug}?preview=true`, '_blank');
+    window.open(`/scan/${publicSlug}?preview=true`, '_blank');
   };
 
   const handleDownload = async () => {

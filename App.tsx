@@ -123,6 +123,8 @@ const AnimatedRoutes = () => {
         <Route path="/r/:slug" element={<PublicReviewPage />} />
         <Route path="/b/:slug" element={<PublicBusinessPage />} />
         
+        <Route path="/qr/:businessId" element={<PublicReviewPage />} />
+        
         {/* Catch-all redirect to Home */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
@@ -137,7 +139,8 @@ const Layout = () => {
   const isLandingPage = location.pathname === '/' || ['/about', '/how-it-works', '/features', '/pricing', '/privacy', '/terms', '/logo'].includes(location.pathname);
   const isPublicRoute = location.pathname.startsWith('/scan/') || 
                         location.pathname.startsWith('/r/') || 
-                        location.pathname.startsWith('/b/');
+                        location.pathname.startsWith('/b/') ||
+                        location.pathname.startsWith('/qr/');
   
   // Theme Management
   const [isDark, setIsDark] = useState(() => {
@@ -246,6 +249,7 @@ function App() {
           <Route path="/scan/:slug" element={<ScanLandingPage />} />
           <Route path="/r/:slug" element={<PublicReviewPage />} />
           <Route path="/b/:slug" element={<PublicBusinessPage />} />
+          <Route path="/qr/:businessId" element={<PublicReviewPage />} />
           <Route path="*" element={<Layout />} />
         </Routes>
       </Router>
