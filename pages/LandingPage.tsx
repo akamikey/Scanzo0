@@ -8,7 +8,12 @@ import { Star, ArrowRight, CheckCircle2, QrCode, Globe, Layout, MessageSquare } 
 
 import PublicFooter from '../components/PublicFooter';
 
-const LandingPage: React.FC = () => {
+interface LandingPageProps {
+  isDark?: boolean;
+  toggleTheme?: () => void;
+}
+
+const LandingPage: React.FC<LandingPageProps> = ({ isDark, toggleTheme }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
 
@@ -31,7 +36,7 @@ const LandingPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-white dark:bg-slate-950 font-sans text-slate-900 dark:text-white overflow-x-hidden flex flex-col">
       
-      <PublicNavbar />
+      <PublicNavbar isDark={isDark} toggleTheme={toggleTheme} />
 
       {/* Hero Section - Modern Startup Style */}
       <section className="relative pt-32 pb-24 overflow-hidden">

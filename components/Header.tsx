@@ -3,17 +3,17 @@ import React, { useRef, useState, useEffect } from 'react';
 import { Moon, Sun, Search, LogOut, ArrowLeft, Loader2, Camera, Upload, Trash2, Menu } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 
 interface HeaderProps {
   toggleSidebar: () => void;
-  isDark: boolean;
-  toggleTheme: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ isDark, toggleTheme, toggleSidebar }) => {
+const Header: React.FC<HeaderProps> = ({ toggleSidebar }) => {
   const { user, ownerData, signOut, refreshData, subscription } = useAuth();
+  const { isDark, toggleTheme } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -239,7 +239,7 @@ const Header: React.FC<HeaderProps> = ({ isDark, toggleTheme, toggleSidebar }) =
               initial={false}
               animate={{ rotate: isDark ? 180 : 0 }}
             >
-              {isDark ? <Moon size={20} /> : <Sun size={20} />}
+              {isDark ? <Sun size={20} /> : <Moon size={20} />}
             </motion.div>
           </button>
             

@@ -33,7 +33,7 @@ const SuccessOverlay: React.FC<{ rating: number, reviewLink?: string, isFeedback
     <motion.div 
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="fixed inset-0 z-[100] bg-white flex items-center justify-center p-6"
+      className="fixed inset-0 z-[100] bg-white dark:bg-slate-900 flex items-center justify-center p-6"
     >
       <motion.div 
         initial={{ scale: 0.8, opacity: 0 }}
@@ -45,16 +45,16 @@ const SuccessOverlay: React.FC<{ rating: number, reviewLink?: string, isFeedback
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
           transition={{ delay: 0.2, type: "spring", damping: 12, stiffness: 200 }}
-          className="w-24 h-24 bg-green-100 text-green-500 rounded-full flex items-center justify-center mx-auto"
+          className="w-24 h-24 bg-green-100 dark:bg-green-900/20 text-green-500 rounded-full flex items-center justify-center mx-auto"
         >
           <CheckCircle2 size={64} strokeWidth={2.5} />
         </motion.div>
         
         <div className="space-y-2">
-          <h2 className="text-2xl font-black text-slate-800 leading-tight">
+          <h2 className="text-2xl font-black text-slate-800 dark:text-white leading-tight">
             {title}
           </h2>
-          <p className="text-slate-500 font-medium">
+          <p className="text-slate-500 dark:text-slate-400 font-medium">
             Your feedback helps businesses improve and grow.
           </p>
         </div>
@@ -63,7 +63,7 @@ const SuccessOverlay: React.FC<{ rating: number, reviewLink?: string, isFeedback
           <motion.p 
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-sm font-bold text-blue-600 bg-blue-50 py-2 px-4 rounded-full inline-block"
+            className="text-sm font-bold text-blue-600 bg-blue-50 dark:bg-blue-900/20 py-2 px-4 rounded-full inline-block"
           >
             You may now close this page.
           </motion.p>
@@ -81,7 +81,7 @@ const SuccessOverlay: React.FC<{ rating: number, reviewLink?: string, isFeedback
 };
 
 const PublicReviewPage: React.FC = () => {
-  const { slug: urlSlug, businessId: urlBusinessId } = useParams<{ slug?: string, businessId?: string }>();
+  const { slug: urlSlug, businessId: urlBusinessId, id: urlId } = useParams<{ slug?: string, businessId?: string, id?: string }>();
   const [loading, setLoading] = useState(true);
   const [links, setLinks] = useState<{ review_link?: string, website_link?: string, owner_id?: string, id?: string } | null>(null);
   const [businessName, setBusinessName] = useState('');
@@ -127,24 +127,31 @@ const PublicReviewPage: React.FC = () => {
         supabase.removeChannel(subscriptionChannel);
       }
     };
-  }, [urlSlug, urlBusinessId, ownerId]);
+  }, [urlSlug, urlBusinessId, urlId, ownerId]);
 
-  const fetchLinks = async () => {
-    if (!urlSlug && !urlBusinessId) {
+  const fetchLinks = async (retryCount = 0) => {
+    if (!urlSlug && !urlBusinessId && !urlId) {
       setLoading(false);
       return;
     }
     
     try {
-      if (urlBusinessId) {
+      if (urlBusinessId || urlId) {
+        const targetId = urlBusinessId || urlId;
         // Fetch by business ID
         const { data: bizData, error: bizError } = await supabase
           .from('businesses')
           .select('id, owner_id, review_link, website_link, subscription_status')
-          .eq('id', urlBusinessId)
+          .eq('id', targetId)
           .maybeSingle();
 
-        if (bizError) throw bizError;
+        if (bizError) {
+          if (bizError.message?.includes('Failed to fetch') && retryCount < 3) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            return fetchLinks(retryCount + 1);
+          }
+          throw bizError;
+        }
 
         if (bizData) {
           setLinks(bizData);
@@ -173,7 +180,13 @@ const PublicReviewPage: React.FC = () => {
           .eq('public_slug', urlSlug)
           .maybeSingle();
 
-        if (ownerError) throw ownerError;
+        if (ownerError) {
+          if (ownerError.message?.includes('Failed to fetch') && retryCount < 3) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            return fetchLinks(retryCount + 1);
+          }
+          throw ownerError;
+        }
 
         if (owner) {
           setBusinessName(owner.business_name);
@@ -286,7 +299,7 @@ const PublicReviewPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#F2F2F7] flex flex-col items-center justify-center p-6 font-sans">
+    <div className="min-h-screen bg-[#F2F2F7] dark:bg-slate-950 flex flex-col items-center justify-center p-6 font-sans">
       {/* Inactive Banner */}
       {isExpired && (
         <div className="fixed top-0 left-0 right-0 bg-amber-500 text-white py-3 px-6 text-center font-bold z-[100] shadow-lg flex items-center justify-center gap-2 text-sm">
@@ -305,19 +318,19 @@ const PublicReviewPage: React.FC = () => {
         )}
       </AnimatePresence>
 
-      <div className={`w-full max-w-md bg-white rounded-[2.5rem] shadow-2xl shadow-blue-500/10 p-8 md:p-10 border border-white/40 backdrop-blur-sm ${isExpired ? 'opacity-75 pointer-events-none grayscale' : ''}`}>
+      <div className={`w-full max-w-md bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl shadow-blue-500/10 p-8 md:p-10 border border-white/40 dark:border-white/5 backdrop-blur-sm ${isExpired ? 'opacity-75 pointer-events-none grayscale' : ''}`}>
         <div className="text-center mb-10">
-          <h1 className="text-2xl font-black text-slate-800 tracking-tight mb-2">{businessName}</h1>
+          <h1 className="text-2xl font-black text-slate-800 dark:text-white tracking-tight mb-2">{businessName}</h1>
           <div className="h-1 w-12 bg-blue-500 mx-auto rounded-full" />
         </div>
 
         {isExpired ? (
           <div className="text-center space-y-4 py-8">
-            <div className="w-16 h-16 bg-amber-100 text-amber-500 rounded-full flex items-center justify-center mx-auto">
+            <div className="w-16 h-16 bg-amber-100 dark:bg-amber-900/20 text-amber-500 rounded-full flex items-center justify-center mx-auto">
               <AlertCircle size={32} />
             </div>
-            <h2 className="text-xl font-bold text-slate-700">Reviews Disabled</h2>
-            <p className="text-slate-500">This business is currently inactive. Please check back later.</p>
+            <h2 className="text-xl font-bold text-slate-700 dark:text-white">Reviews Disabled</h2>
+            <p className="text-slate-500 dark:text-slate-400">This business is currently inactive. Please check back later.</p>
             <button 
               onClick={() => window.location.href = `/b/${slug}`}
               className="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold mt-4 pointer-events-auto"
@@ -329,7 +342,7 @@ const PublicReviewPage: React.FC = () => {
           <>
             {step === 'rating' && (
               <div className="space-y-8 text-center">
-                <h2 className="text-xl font-bold text-slate-700">How was your experience?</h2>
+                <h2 className="text-xl font-bold text-slate-700 dark:text-white">How was your experience?</h2>
                 <div className="flex justify-center gap-2">
                   {[1, 2, 3, 4, 5].map((star) => (
                     <motion.button
@@ -344,23 +357,23 @@ const PublicReviewPage: React.FC = () => {
                       <Star
                         size={48}
                         className={`${
-                          star <= (hover || rating) ? 'text-amber-400 fill-amber-400' : 'text-slate-200'
+                          star <= (hover || rating) ? 'text-amber-400 fill-amber-400' : 'text-slate-200 dark:text-slate-800'
                         } transition-colors duration-200`}
                       />
                     </motion.button>
                   ))}
                 </div>
-                <p className="text-slate-400 text-sm font-medium">Tap a star to rate us</p>
+                <p className="text-slate-400 dark:text-slate-500 text-sm font-medium">Tap a star to rate us</p>
               </div>
             )}
 
             {step === 'feedback' && (
               <form onSubmit={handleSubmitFeedback} className="space-y-6">
                 <div className="text-center mb-6">
-                  <h2 className="text-xl font-bold text-slate-700 mb-2">
+                  <h2 className="text-xl font-bold text-slate-700 dark:text-white mb-2">
                     {rating >= 4 ? "We're glad you enjoyed it!" : "We'd love to hear more"}
                   </h2>
-                  <p className="text-slate-500 text-sm">
+                  <p className="text-slate-500 dark:text-slate-400 text-sm">
                     {rating >= 4 
                       ? "Share a quick note about your experience." 
                       : "Your feedback helps us improve our service."}
@@ -369,18 +382,18 @@ const PublicReviewPage: React.FC = () => {
 
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">Your Name</label>
+                    <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2 ml-1">Your Name</label>
                     <input
                       type="text"
                       value={customerName}
                       onChange={(e) => setCustomerName(e.target.value)}
                       placeholder="Optional"
-                      className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 transition-all text-slate-700 font-medium"
+                      className="w-full p-4 bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-white/5 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 transition-all text-slate-700 dark:text-white font-medium"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">
+                    <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2 ml-1">
                       {rating >= 4 ? "Your Message (Optional)" : "Your Feedback"}
                     </label>
                     <textarea
@@ -391,7 +404,7 @@ const PublicReviewPage: React.FC = () => {
                         ? "Write a short message about your experience (optional)" 
                         : "Tell us what went wrong so we can improve."}
                       rows={4}
-                      className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 transition-all text-slate-700 font-medium resize-none"
+                      className="w-full p-4 bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-white/5 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 transition-all text-slate-700 dark:text-white font-medium resize-none"
                     />
                   </div>
                 </div>

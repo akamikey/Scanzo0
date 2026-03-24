@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 
 interface OwnerData {
   id: string;
+  business_id?: string;
   business_name: string;
   review_link: string;
   public_slug: string;
@@ -67,26 +68,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           try {
               const { data: businessData, error: bError } = await supabase
                 .from('businesses')
-                .select('review_link, subscription_status')
+                .select('id, review_link, subscription_status')
                 .eq('owner_id', userId)
                 .maybeSingle();
                 
               if (bError) {
                   if (bError.message?.includes('Failed to fetch') && retryCount < 3) {
-                      // We don't recurse the whole function here to avoid infinite loops, 
-                      // but we can retry this specific call if needed.
+                      // We don't retry here to avoid complexity, but we could
                   }
                   // If column doesn't exist, try fallback column names
                   const { data: fallbackData } = await supabase
                     .from('businesses')
-                    .select('google_review_link')
+                    .select('id, google_review_link')
                     .eq('owner_id', userId)
                     .maybeSingle();
                   
                   if (fallbackData) {
-                      finalOwnerData = { ...finalOwnerData, review_link: (fallbackData as any).google_review_link };
+                      finalOwnerData = { 
+                        ...finalOwnerData, 
+                        business_id: fallbackData.id,
+                        review_link: (fallbackData as any).google_review_link 
+                      };
                   }
               } else if (businessData) {
+                  finalOwnerData = { ...finalOwnerData, business_id: businessData.id };
                   if (businessData.review_link) {
                       finalOwnerData = { ...finalOwnerData, review_link: businessData.review_link };
                   }

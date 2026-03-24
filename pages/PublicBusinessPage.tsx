@@ -392,7 +392,7 @@ const PublicBusinessPage: React.FC = () => {
               )}
               
               <button 
-                onClick={() => !isExpired && window.open(`#/r/${slug}`, '_blank')}
+                onClick={() => !isExpired && window.open(`/r/${slug}`, '_blank')}
                 disabled={isExpired}
                 className={`w-full py-4 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
                   isExpired 

@@ -80,13 +80,19 @@ const QrCodePage: React.FC = () => {
   const [showPreview, setShowPreview] = useState(false);
   
   const publicSlug = ownerData?.public_slug || 'demo-business';
+  const businessId = ownerData?.business_id;
   const businessName = ownerData?.business_name || 'Our Business';
   
-  const publicLink = `${window.location.origin}/scan/${publicSlug}`;
+  // Use the new public QR route if business_id is available, otherwise fallback to slug
+  const publicLink = businessId 
+    ? `${window.location.origin}/q/${businessId}`
+    : `${window.location.origin}/scan/${publicSlug}`;
+    
   const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=1000x1000&data=${encodeURIComponent(publicLink)}`;
 
   const handleSimulateScan = () => {
-    window.open(`/scan/${publicSlug}?preview=true`, '_blank');
+    const simulateUrl = businessId ? `/q/${businessId}` : `/scan/${publicSlug}`;
+    window.open(`${simulateUrl}?preview=true`, '_blank');
   };
 
   const handleDownload = async () => {

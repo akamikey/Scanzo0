@@ -22,6 +22,7 @@ import ScanLandingPage from './pages/ScanLandingPage';
 import AuthModal from './components/AuthModal';
 import { AnimatePresence, motion } from 'framer-motion';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { Home, BarChart2, QrCode, CreditCard, Settings, Star, Sparkles, Link as LinkIcon } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -123,7 +124,9 @@ const AnimatedRoutes = () => {
         <Route path="/r/:slug" element={<PublicReviewPage />} />
         <Route path="/b/:slug" element={<PublicBusinessPage />} />
         
-        <Route path="/qr/:businessId" element={<PublicReviewPage />} />
+        <Route path="/qr/:id" element={<ScanLandingPage />} />
+        <Route path="/q/:id" element={<ScanLandingPage />} />
+        <Route path="/review/:id" element={<PublicReviewPage />} />
         
         {/* Catch-all redirect to Home */}
         <Route path="*" element={<Navigate to="/" replace />} />
@@ -134,36 +137,24 @@ const AnimatedRoutes = () => {
 
 const Layout = () => {
   const { user, loading } = useAuth();
+  const { isDark, toggleTheme } = useTheme();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
-  const isLandingPage = location.pathname === '/' || ['/about', '/how-it-works', '/features', '/pricing', '/privacy', '/terms', '/logo'].includes(location.pathname);
-  const isPublicRoute = location.pathname.startsWith('/scan/') || 
-                        location.pathname.startsWith('/r/') || 
-                        location.pathname.startsWith('/b/') ||
-                        location.pathname.startsWith('/qr/');
   
-  // Theme Management
-  const [isDark, setIsDark] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return document.documentElement.classList.contains('dark') || 
-             localStorage.getItem('theme') === 'dark' ||
-             (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches);
-    }
-    return false;
-  });
-
-  useEffect(() => {
-    const root = document.documentElement;
-    if (isDark) {
-      root.classList.add('dark');
-      localStorage.setItem('theme', 'dark');
-    } else {
-      root.classList.remove('dark');
-      localStorage.setItem('theme', 'light');
-    }
-  }, [isDark]);
-
-  const toggleTheme = () => setIsDark(!isDark);
+  // Define protected routes that REQUIRE authentication
+  const protectedRoutes = ['/dashboard', '/insights', '/qr-code', '/google-link', '/subscribe', '/settings'];
+  const isProtectedRoute = protectedRoutes.some(path => location.pathname.startsWith(path));
+  
+  // Define landing/info pages that are public
+  const isLandingPage = location.pathname === '/' || ['/about', '/how-it-works', '/features', '/pricing', '/privacy', '/terms', '/logo'].includes(location.pathname);
+  
+  // Define direct public access routes (QR scans, reviews, etc)
+  const isPublicDirectRoute = location.pathname.startsWith('/scan/') || 
+                               location.pathname.startsWith('/r/') || 
+                               location.pathname.startsWith('/b/') ||
+                               location.pathname.startsWith('/qr/') ||
+                               location.pathname.startsWith('/q/') ||
+                               location.pathname.startsWith('/review/');
   
   if (loading) {
     return (
@@ -173,18 +164,8 @@ const Layout = () => {
     );
   }
 
-  // If it's a public route, render it without any dashboard layout or auth checks
-  if (isPublicRoute) {
-     return (
-        <>
-           <ScrollToTop />
-           <AnimatedRoutes />
-        </>
-     );
-  }
-
-  // If it's the landing page, render it without the dashboard layout
-  if (isLandingPage) {
+  // If it's a public route or landing page, render it directly without dashboard layout or auth checks
+  if (isPublicDirectRoute || isLandingPage) {
      // Redirect logged-in users from landing page to dashboard
      if (user && location.pathname === '/') {
         return <Navigate to="/dashboard" replace />;
@@ -200,8 +181,8 @@ const Layout = () => {
 
   return (
     <div className="h-screen w-full bg-gray-50 dark:bg-slate-900 text-gray-900 dark:text-gray-100 transition-colors duration-300 relative overflow-hidden flex">
-      {/* Only show AuthModal if NOT on landing page/public route and NOT logged in */}
-      {!user && <AuthModal isOpen={true} />}
+      {/* Only show AuthModal for protected routes if NOT logged in */}
+      {isProtectedRoute && !user && <AuthModal isOpen={true} />}
       
       <ScrollToTop />
 
@@ -216,11 +197,9 @@ const Layout = () => {
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       {/* Main Column */}
-      <div className={`flex-1 flex flex-col h-full relative z-10 transition-all duration-300 ${user ? 'lg:pl-64' : ''} ${!user ? 'blur-sm pointer-events-none' : ''}`}>
+      <div className={`flex-1 flex flex-col h-full relative z-10 transition-all duration-300 ${user ? 'lg:pl-64' : ''} ${isProtectedRoute && !user ? 'blur-sm pointer-events-none' : ''}`}>
         <Header 
           toggleSidebar={() => setSidebarOpen(!sidebarOpen)} 
-          isDark={isDark} 
-          toggleTheme={toggleTheme} 
         />
 
         {/* Scrollable Main Content Area - Content happens ABOVE the nav bar */}
@@ -244,15 +223,13 @@ const Layout = () => {
 function App() {
   return (
     <AuthProvider>
-      <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-        <Routes>
-          <Route path="/scan/:slug" element={<ScanLandingPage />} />
-          <Route path="/r/:slug" element={<PublicReviewPage />} />
-          <Route path="/b/:slug" element={<PublicBusinessPage />} />
-          <Route path="/qr/:businessId" element={<PublicReviewPage />} />
-          <Route path="*" element={<Layout />} />
-        </Routes>
-      </Router>
+      <ThemeProvider>
+        <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+          <Routes>
+            <Route path="*" element={<Layout />} />
+          </Routes>
+        </Router>
+      </ThemeProvider>
     </AuthProvider>
   );
 }
