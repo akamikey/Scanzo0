@@ -49,7 +49,6 @@ export default function ScanLandingPage() {
           ownerId = biz.owner_id;
           setReviewLink(biz.review_link);
           setWebsiteLink(biz.website_link);
-          setIsExpired(biz.subscription_status !== 'active');
 
           // Get owner info
           const { data: owner } = await supabase
@@ -91,7 +90,6 @@ export default function ScanLandingPage() {
           if (biz) {
             setReviewLink(biz.review_link);
             setWebsiteLink(biz.website_link);
-            setIsExpired(biz.subscription_status !== 'active');
           }
         }
 
@@ -107,24 +105,33 @@ export default function ScanLandingPage() {
 
         if (pageData?.logo_url) setLogoUrl(pageData.logo_url);
 
-        // 4. Real-time Subscription Updates
-        subscriptionChannel = supabase
-          .channel(`business-${ownerId}`)
-          .on(
-            'postgres_changes',
-            {
-              event: 'UPDATE',
-              schema: 'public',
-              table: 'businesses',
-              filter: `owner_id=eq.${ownerId}`
-            },
-            (payload) => {
-              // const newStatus = payload.new.subscription_status;
-              // setIsExpired(newStatus !== 'active');
-              setIsExpired(false); // Forced active for demo
-            }
-          )
-          .subscribe();
+        // 4. Fetch subscription data
+        const subRes = await fetch(`https://senkiwubyxeozgvycwjo.supabase.co/rest/v1/subscriptions?select=*&user_id=eq.${ownerId}&order=created_at.desc&limit=1`, {
+          headers: {
+            'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNlbmtpd3VieXhlb3pndnljd2pvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU5NjQyNTMsImV4cCI6MjA4MTU0MDI1M30.97V4aCtU464P2rT6PQn57uUvDsuTpKbsF_vRW0R-3hQ',
+            'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNlbmtpd3VieXhlb3pndnljd2pvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU5NjQyNTMsImV4cCI6MjA4MTU0MDI1M30.97V4aCtU464P2rT6PQn57uUvDsuTpKbsF_vRW0R-3hQ'
+          }
+        });
+        
+        const subData = await subRes.json();
+        
+        if (!subData || subData.length === 0) {
+          setError("No active subscription");
+          setLoading(false);
+          return;
+        } else {
+          const sub = subData[0];
+          const endDate = new Date(sub.end_date);
+          const now = new Date();
+          
+          if (now < endDate) {
+            setIsExpired(false);
+          } else {
+            setError("Subscription expired");
+            setLoading(false);
+            return;
+          }
+        }
 
       } catch (err) {
         console.error("Error fetching business data:", err);
@@ -156,17 +163,56 @@ export default function ScanLandingPage() {
 
   if (error) {
     return (
-      <div className="min-h-[100dvh] bg-[#F2F2F7] dark:bg-slate-950 flex flex-col items-center justify-center p-6 text-center">
-        <div className="w-20 h-20 bg-red-100 dark:bg-red-900/20 text-red-500 rounded-full flex items-center justify-center mb-6">
-          <AlertCircle size={40} />
+      <div className="min-h-[100dvh] bg-[#F2F2F7] dark:bg-slate-950 flex flex-col items-center justify-center p-6 text-center relative overflow-hidden">
+        {/* Ambient Background */}
+        <div className="fixed inset-0 pointer-events-none z-0">
+          <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] bg-red-400/10 dark:bg-red-900/10 rounded-full blur-[120px]" />
+          <div className="absolute bottom-[-20%] right-[-10%] w-[500px] h-[500px] bg-orange-400/10 dark:bg-orange-900/10 rounded-full blur-[120px]" />
         </div>
-        <h1 className="text-2xl font-bold text-slate-800 dark:text-white mb-2">{error}</h1>
-        <button 
-          onClick={() => navigate('/')}
-          className="px-8 py-3 bg-blue-600 text-white rounded-xl font-bold mt-4"
+
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="relative z-10 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl p-8 md:p-12 rounded-[2.5rem] shadow-2xl shadow-red-500/10 border border-white/50 dark:border-white/5 max-w-md w-full flex flex-col items-center"
         >
-          Go Back
-        </button>
+          <motion.div 
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ type: "spring", damping: 12, stiffness: 200, delay: 0.1 }}
+            className="w-24 h-24 bg-red-100 dark:bg-red-900/30 text-red-500 rounded-full flex items-center justify-center mb-6 shadow-inner"
+          >
+            <AlertCircle size={48} strokeWidth={2} />
+          </motion.div>
+          
+          <h1 className="text-3xl font-black text-slate-800 dark:text-white mb-3 tracking-tight">
+            {error === 'Subscription expired' ? 'Access Denied' : 'Oops!'}
+          </h1>
+          
+          <p className="text-slate-500 dark:text-slate-400 font-medium mb-8 text-lg">
+            {error}
+          </p>
+
+          {error === 'Subscription expired' ? (
+            <motion.button 
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => navigate('/subscribe')}
+              className="w-full py-4 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-500/25 transition-all flex items-center justify-center gap-2 text-lg"
+            >
+              Subscribe Now
+              <ChevronRight size={20} />
+            </motion.button>
+          ) : (
+            <motion.button 
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => navigate('/')}
+              className="w-full py-4 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-white rounded-2xl font-bold transition-all text-lg"
+            >
+              Go Back
+            </motion.button>
+          )}
+        </motion.div>
       </div>
     );
   }

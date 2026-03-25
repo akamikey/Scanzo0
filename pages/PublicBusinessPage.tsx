@@ -209,24 +209,69 @@ const PublicBusinessPage: React.FC = () => {
 
   if (error || !page) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-black p-6 text-center">
-        <div className="w-20 h-20 bg-red-100 dark:bg-red-900/20 text-red-500 rounded-full flex items-center justify-center mb-6">
-          <AlertCircle size={40} />
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-black p-6 text-center relative overflow-hidden">
+        <div className="fixed inset-0 pointer-events-none z-0">
+          <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] bg-red-400/10 dark:bg-red-900/10 rounded-full blur-[120px]" />
         </div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">{error}</h1>
-        <p className="text-gray-500 max-w-xs">The page you are looking for might have been moved or deleted.</p>
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="relative z-10 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl p-8 md:p-12 rounded-[2.5rem] shadow-2xl shadow-red-500/10 border border-white/50 dark:border-white/5 max-w-md w-full flex flex-col items-center"
+        >
+          <motion.div 
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ type: "spring", damping: 12, stiffness: 200, delay: 0.1 }}
+            className="w-24 h-24 bg-red-100 dark:bg-red-900/30 text-red-500 rounded-full flex items-center justify-center mb-6 shadow-inner"
+          >
+            <AlertCircle size={48} strokeWidth={2} />
+          </motion.div>
+          <h1 className="text-3xl font-black text-gray-900 dark:text-white mb-3 tracking-tight">{error || "Business Not Found"}</h1>
+          <p className="text-gray-500 dark:text-gray-400 font-medium mb-8 text-lg">The page you are looking for might have been moved or deleted.</p>
+          <motion.button 
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => navigate('/')}
+            className="w-full py-4 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-white rounded-2xl font-bold transition-all text-lg"
+          >
+            Go Back
+          </motion.button>
+        </motion.div>
       </div>
     );
   }
 
   if (isExpired) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-black p-6 text-center">
-        <div className="w-20 h-20 bg-amber-100 dark:bg-amber-900/20 text-amber-500 rounded-full flex items-center justify-center mb-6">
-          <AlertCircle size={40} />
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-black p-6 text-center relative overflow-hidden">
+        <div className="fixed inset-0 pointer-events-none z-0">
+          <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] bg-amber-400/10 dark:bg-amber-900/10 rounded-full blur-[120px]" />
         </div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Subscription Inactive</h1>
-        <p className="text-gray-500 max-w-xs">This business subscription is inactive. Please contact owner.</p>
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="relative z-10 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl p-8 md:p-12 rounded-[2.5rem] shadow-2xl shadow-amber-500/10 border border-white/50 dark:border-white/5 max-w-md w-full flex flex-col items-center"
+        >
+          <motion.div 
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ type: "spring", damping: 12, stiffness: 200, delay: 0.1 }}
+            className="w-24 h-24 bg-amber-100 dark:bg-amber-900/30 text-amber-500 rounded-full flex items-center justify-center mb-6 shadow-inner"
+          >
+            <AlertCircle size={48} strokeWidth={2} />
+          </motion.div>
+          <h1 className="text-3xl font-black text-gray-900 dark:text-white mb-3 tracking-tight">Subscription Inactive</h1>
+          <p className="text-gray-500 dark:text-gray-400 font-medium mb-8 text-lg">This business subscription is inactive. Please contact owner.</p>
+          <motion.button 
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => navigate('/subscribe')}
+            className="w-full py-4 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-500/25 transition-all flex items-center justify-center gap-2 text-lg"
+          >
+            Subscribe Now
+            <ChevronRight size={20} />
+          </motion.button>
+        </motion.div>
       </div>
     );
   }

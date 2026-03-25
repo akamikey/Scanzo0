@@ -11,7 +11,7 @@ const PLANS = [
     id: 'monthly',
     name: 'Monthly Plan',
     price: 250,
-    planId: 'plan_STxKdWOYODRHqL',
+    planId: 'plan_SVVP7NfadsPhgb',
     savings: '',
     color: 'from-blue-500 to-cyan-500',
     popular: false,
@@ -20,7 +20,7 @@ const PLANS = [
     id: 'biannual',
     name: '6 Months Plan',
     price: 1250,
-    planId: 'plan_STxMY7FBbIvQcJ',
+    planId: 'plan_SVVTUMhJomsRSD',
     savings: 'Save ₹250',
     color: 'from-purple-500 to-pink-500',
     popular: true,
@@ -29,7 +29,7 @@ const PLANS = [
     id: 'annual',
     name: 'Yearly Plan',
     price: 2500,
-    planId: 'plan_SUIxB3anFaPXYG',
+    planId: 'plan_SVVV0PIfP8o8Il',
     savings: 'Save ₹500',
     color: 'from-orange-500 to-red-500',
     popular: false,
@@ -117,119 +117,81 @@ const SubscribePage: React.FC = () => {
     setPaymentStatus('cancelled');
   };
 
-  const handlePayment = async (plan: typeof PLANS[0]) => {
+  const openPayment = async (planId: string) => {
     if (!user) {
         alert("Please sign in to subscribe.");
         return;
     }
 
+    const plan = PLANS.find(p => p.planId === planId);
+    if (!plan) return;
+
     setProcessingId(plan.id);
     setPaymentStatus('idle');
+    setErrorDetails(null);
+    setActivePlanId(plan.id);
 
-    if (typeof Razorpay === 'undefined') {
-        alert('Razorpay SDK failed to load. Are you online?');
+    if (typeof window.Razorpay === 'undefined') {
         setProcessingId(null);
+        setPaymentStatus('cancelled');
+        setErrorDetails({ message: 'Something went wrong' });
         return;
     }
 
     try {
-      // 1. Create subscription on the backend
-      const response = await fetch('/api/create-subscription', {
+      const token = session?.access_token;
+      const res = await fetch('https://senkiwubyxeozgvycwjo.supabase.co/functions/v1/create-order', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
         },
-        body: JSON.stringify({
-          planId: plan.id,
-          userId: user.id
-        }),
+        body: JSON.stringify({ amount: plan.price })
       });
 
-      const data = await response.json();
+      const data = await res.json();
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to create subscription');
-      }
-
-      // If it's a fallback link, just redirect
-      if (data.is_fallback && data.short_url) {
-        window.location.href = data.short_url;
-        return;
-      }
-
-      // 2. Open Razorpay checkout with the subscription ID
-      const options = {
-        key: data.key_id || "rzp_live_STxlKmH3jUfhCg", // Fallback to default if not provided
-        subscription_id: data.id,
-        name: "Scanzo",
-        description: `${plan.name} Subscription`,
-        handler: function (response: any) {
-          navigate(`/subscribe?razorpay_payment_id=${response.razorpay_payment_id}&plan=${plan.id}`, { replace: true });
-        },
-        prefill: {
-          email: user.email,
-        },
-        theme: {
-          color: "#3399cc"
-        },
-        modal: {
-          ondismiss: function() {
+      if (data.order_id) {
+        const options = {
+          key: "rzp_live_STxlKmH3jUfhCg",
+          name: "Scanzo",
+          description: "Subscription",
+          order_id: data.order_id,
+          handler: function (response: any) {
             setProcessingId(null);
-            navigate(`/subscribe?cancelled=true&plan=${plan.id}`, { replace: true });
+            handleSuccessFlow(plan.id);
+          },
+          modal: {
+            ondismiss: function() {
+              setProcessingId(null);
+              setPaymentStatus('cancelled');
+              setErrorDetails({ message: 'Payment cancelled' });
+            }
           }
-        }
-      };
+        };
 
-      const rzp = new Razorpay(options);
-      rzp.open();
+        const rzp = new window.Razorpay(options);
+        rzp.on('payment.failed', function (response: any) {
+          setProcessingId(null);
+          setPaymentStatus('cancelled');
+          setErrorDetails({ message: 'Payment failed. Please try again' });
+        });
+        rzp.open();
+      } else {
+        setProcessingId(null);
+        setPaymentStatus('cancelled');
+        setErrorDetails({ message: 'Something went wrong' });
+      }
     } catch (error: any) {
       console.error('Payment error:', error);
-      setErrorDetails({
-        message: 'Payment Initialization Failed',
-        details: error.message
-      });
       setProcessingId(null);
+      setPaymentStatus('cancelled');
+      setErrorDetails({ message: 'Something went wrong' });
     }
   };
 
   return (
     <div className="space-y-8 relative pb-20 min-h-screen">
-      {/* Error Modal */}
-      <AnimatePresence>
-        {errorDetails && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="bg-white dark:bg-slate-900 rounded-3xl p-8 max-w-md w-full shadow-2xl border border-red-500/20"
-            >
-              <div className="flex flex-col items-center text-center">
-                <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 text-red-600 rounded-full flex items-center justify-center mb-6">
-                  <AlertCircle size={32} />
-                </div>
-                <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">{errorDetails.message}</h3>
-                {errorDetails.details && (
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">{errorDetails.details}</p>
-                )}
-                {errorDetails.help && (
-                  <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-2xl text-left mb-6 border border-blue-100 dark:border-blue-500/20">
-                    <p className="text-xs font-bold text-blue-700 dark:text-blue-300 uppercase tracking-wider mb-1">💡 Pro Tip</p>
-                    <p className="text-sm text-blue-600 dark:text-blue-400">{errorDetails.help}</p>
-                  </div>
-                )}
-                <button 
-                  onClick={() => setErrorDetails(null)}
-                  className="w-full py-3 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-xl font-bold hover:opacity-90 transition-all"
-                >
-                  Got it, thanks
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
       {/* Dim Overlay */}
       <AnimatePresence>
         {(paymentStatus === 'activating' || paymentStatus === 'success') && (
@@ -366,8 +328,8 @@ const SubscribePage: React.FC = () => {
                         >
                           <Check size={48} strokeWidth={4} />
                         </motion.div>
-                        <h3 className="text-2xl font-black text-green-600 dark:text-green-400 mb-1">✨ Premium Unlocked</h3>
-                        <p className="font-bold text-green-700 dark:text-green-300">✔ Subscription Activated</p>
+                        <h3 className="text-2xl font-black text-green-600 dark:text-green-400 mb-1">Subscription Activated 🎉</h3>
+                        <p className="font-bold text-green-700 dark:text-green-300">Your plan is now active</p>
                       </motion.div>
                     )}
                   </AnimatePresence>
@@ -412,11 +374,12 @@ const SubscribePage: React.FC = () => {
                         <div className="space-y-4">
                           <div className="flex flex-col items-center text-center p-4 bg-red-50 dark:bg-red-900/20 rounded-2xl border border-red-200 dark:border-red-500/20">
                             <XCircle className="text-red-500 mb-2" size={32} />
-                            <p className="text-sm font-bold text-red-600 dark:text-red-400">❌ Payment Cancelled</p>
-                            <p className="text-xs text-red-500/80 dark:text-red-400/60 mt-1">Your Premium plan was not activated.</p>
+                            <p className="text-sm font-bold text-red-600 dark:text-red-400">
+                              {errorDetails?.message || "Payment cancelled"}
+                            </p>
                           </div>
                           <button
-                              onClick={() => handlePayment(plan)}
+                              onClick={() => openPayment(plan.planId)}
                               className="w-full py-4 px-6 rounded-2xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-bold shadow-xl transition-all hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-2"
                           >
                               <CreditCard size={20} />
@@ -430,7 +393,7 @@ const SubscribePage: React.FC = () => {
                         </div>
                       ) : (
                         <button
-                            onClick={() => handlePayment(plan)}
+                            onClick={() => openPayment(plan.planId)}
                             disabled={!!processingId}
                             className={`w-full py-4 px-6 rounded-2xl text-white font-bold shadow-xl transition-all transform active:scale-95 bg-gradient-to-r ${plan.color} hover:brightness-110 flex items-center justify-center gap-2 group`}
                         >
@@ -445,47 +408,6 @@ const SubscribePage: React.FC = () => {
                         </button>
                       )}
 
-                      {/* Detailed Error Display */}
-                      {errorDetails && processingId === plan.id && (
-                        <motion.div 
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          className="mt-6 p-5 rounded-3xl bg-red-50 dark:bg-red-900/20 border-2 border-red-100 dark:border-red-500/20 space-y-3 shadow-xl shadow-red-500/5"
-                        >
-                          <div className="flex items-start gap-3">
-                            <div className="p-2 bg-red-100 dark:bg-red-500/20 rounded-xl text-red-600 dark:text-red-400">
-                              <AlertCircle size={20} />
-                            </div>
-                            <div className="flex-1">
-                              <h4 className="text-sm font-black text-red-700 dark:text-red-300 uppercase tracking-wider">Payment Error</h4>
-                              <p className="text-sm font-bold text-red-600 dark:text-red-400/90 mt-1 leading-relaxed">
-                                {errorDetails.message}
-                              </p>
-                            </div>
-                          </div>
-
-                          {errorDetails.details && (
-                            <div className="pl-11">
-                              <p className="text-[11px] font-bold text-red-500/70 dark:text-red-400/50 uppercase tracking-widest mb-1">Error Details</p>
-                              <code className="block p-2 bg-white/50 dark:bg-black/20 rounded-lg text-[10px] font-mono text-red-800 dark:text-red-200 break-all border border-red-100/50 dark:border-red-500/10">
-                                {errorDetails.details}
-                              </code>
-                            </div>
-                          )}
-
-                          {errorDetails.help && (
-                            <div className="pl-11 pt-2 border-t border-red-200/50 dark:border-red-500/10">
-                              <div className="flex items-center gap-2 mb-1">
-                                <Sparkles size={14} className="text-blue-500" />
-                                <span className="text-[11px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest">Pro Tip</span>
-                              </div>
-                              <p className="text-xs font-bold text-slate-600 dark:text-slate-300 leading-relaxed italic">
-                                {errorDetails.help}
-                              </p>
-                            </div>
-                          )}
-                        </motion.div>
-                      )}
                   </div>
                 </GlassCard>
               </motion.div>
