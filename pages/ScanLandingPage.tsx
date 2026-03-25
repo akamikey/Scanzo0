@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { Star, Building2, ChevronRight, AlertCircle } from 'lucide-react';
+import { Star, Building2, ChevronRight, AlertCircle, Lock } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export default function ScanLandingPage() {
@@ -116,9 +116,7 @@ export default function ScanLandingPage() {
         const subData = await subRes.json();
         
         if (!subData || subData.length === 0) {
-          setError("No active subscription");
-          setLoading(false);
-          return;
+          setIsExpired(true);
         } else {
           const sub = subData[0];
           const endDate = new Date(sub.end_date);
@@ -127,9 +125,7 @@ export default function ScanLandingPage() {
           if (now < endDate) {
             setIsExpired(false);
           } else {
-            setError("Subscription expired");
-            setLoading(false);
-            return;
+            setIsExpired(true);
           }
         }
 
@@ -185,45 +181,24 @@ export default function ScanLandingPage() {
           </motion.div>
           
           <h1 className="text-3xl font-black text-slate-800 dark:text-white mb-3 tracking-tight">
-            {error === 'Subscription expired' ? 'Access Denied' : 'Oops!'}
+            Oops!
           </h1>
           
-          <p className="text-slate-500 dark:text-slate-400 font-medium mb-8 text-lg">
+          <p className="text-slate-500 dark:text-slate-400 font-medium text-lg">
             {error}
           </p>
-
-          {error === 'Subscription expired' ? (
-            <motion.button 
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => navigate('/subscribe')}
-              className="w-full py-4 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-500/25 transition-all flex items-center justify-center gap-2 text-lg"
-            >
-              Subscribe Now
-              <ChevronRight size={20} />
-            </motion.button>
-          ) : (
-            <motion.button 
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => navigate('/')}
-              className="w-full py-4 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-white rounded-2xl font-bold transition-all text-lg"
-            >
-              Go Back
-            </motion.button>
-          )}
         </motion.div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-[100dvh] bg-[#F2F2F7] dark:bg-slate-950 flex flex-col items-center justify-center p-6 relative overflow-hidden font-sans">
+    <div className={`min-h-[100dvh] bg-[#F2F2F7] dark:bg-slate-950 flex flex-col items-center p-6 relative overflow-hidden font-sans ${isExpired ? 'pt-24 justify-start' : 'justify-center'}`}>
       {/* Inactive Banner */}
       {isExpired && (
-        <div className="fixed top-0 left-0 right-0 bg-amber-500 text-white py-3 px-6 text-center font-bold z-[100] shadow-lg flex items-center justify-center gap-2 text-sm">
-          <AlertCircle size={18} />
-          <span>Business Inactive - Explore & Reviews Disabled</span>
+        <div className="fixed top-0 left-0 right-0 bg-amber-500 text-white py-4 px-6 text-center font-bold z-[100] shadow-lg flex items-center justify-center gap-2 text-base animate-pulse">
+          <AlertCircle size={20} />
+          <span>Business currently inactive, contact owner</span>
         </div>
       )}
       
@@ -273,17 +248,21 @@ export default function ScanLandingPage() {
             <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 transition-all shadow-sm ${
               isExpired || (!businessSlug && !websiteLink) ? 'bg-gray-200 dark:bg-slate-800 text-gray-400' : 'bg-blue-100 dark:bg-blue-900/30 text-blue-500 group-hover:bg-blue-500 group-hover:text-white'
             }`}>
-              <Building2 size={28} />
+              {isExpired ? <Lock size={24} /> : <Building2 size={28} />}
             </div>
             <div className="flex-1">
               <h3 className={`font-bold text-lg ${isExpired ? 'text-slate-400' : 'text-slate-800 dark:text-white'}`}>
-                {isExpired ? 'Explore Disabled' : 'Explore Business'}
+                {isExpired ? 'Explore Locked' : 'Explore Business'}
               </h3>
               <p className="text-sm text-slate-500 dark:text-slate-400">
-                {isExpired ? 'Subscription inactive' : 'View our services, gallery & more'}
+                {isExpired ? 'Business inactive' : 'View our services, gallery & more'}
               </p>
             </div>
-            {!isExpired && (businessSlug || websiteLink) && <ChevronRight className="text-slate-300 dark:text-slate-600 group-hover:text-slate-500 dark:group-hover:text-slate-400 transition-all" />}
+            {!isExpired && (businessSlug || websiteLink) ? (
+              <ChevronRight className="text-slate-300 dark:text-slate-600 group-hover:text-slate-500 dark:group-hover:text-slate-400 transition-all" />
+            ) : isExpired ? (
+              <Lock size={16} className="text-slate-300 dark:text-slate-600" />
+            ) : null}
           </motion.div>
 
           {/* Review Card */}
@@ -302,17 +281,21 @@ export default function ScanLandingPage() {
             <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 transition-all shadow-sm ${
               isExpired ? 'bg-gray-200 dark:bg-slate-800 text-gray-400' : 'bg-amber-100 dark:bg-amber-900/30 text-amber-500 group-hover:bg-amber-500 group-hover:text-white'
             }`}>
-              <Star size={28} className="fill-current" />
+              {isExpired ? <Lock size={24} /> : <Star size={28} className="fill-current" />}
             </div>
             <div className="flex-1">
               <h3 className={`font-bold text-lg ${isExpired ? 'text-slate-400' : 'text-slate-800 dark:text-white'}`}>
-                {isExpired ? 'Reviews Disabled' : 'Leave a Review'}
+                {isExpired ? 'Reviews Locked' : 'Leave a Review'}
               </h3>
               <p className="text-sm text-slate-500 dark:text-slate-400">
-                {isExpired ? 'Subscription inactive' : 'Tell us about your experience'}
+                {isExpired ? 'Business inactive' : 'Tell us about your experience'}
               </p>
             </div>
-            {!isExpired && <ChevronRight className="text-slate-300 dark:text-slate-600 group-hover:text-slate-500 dark:group-hover:text-slate-400 transition-all" />}
+            {!isExpired ? (
+              <ChevronRight className="text-slate-300 dark:text-slate-600 group-hover:text-slate-500 dark:group-hover:text-slate-400 transition-all" />
+            ) : (
+              <Lock size={16} className="text-slate-300 dark:text-slate-600" />
+            )}
           </motion.div>
 
         </div>
