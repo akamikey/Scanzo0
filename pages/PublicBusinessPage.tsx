@@ -55,6 +55,7 @@ interface Review {
 
 const PublicBusinessPage: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState<BusinessPage | null>(null);

@@ -40,6 +40,12 @@ begin
   set google_review_link = p_link,
       updated_at = now()
   where owner_id = v_uid;
+
+  -- 4. Update business_links table (UPSERT)
+  insert into public.business_links (owner_id, review_link)
+  values (v_uid, p_link)
+  on conflict (owner_id) do update
+  set review_link = p_link;
   
   return json_build_object('success', true);
 exception when others then

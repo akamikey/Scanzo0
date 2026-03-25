@@ -25,9 +25,7 @@ const SuccessOverlay: React.FC<{ rating: number, reviewLink?: string, isFeedback
     }
   }, [rating, reviewLink]);
 
-  const title = isFeedback 
-    ? "Thank you for helping this business improve ❤️" 
-    : "Thank you for supporting this business ❤️";
+  const title = "Feedback submitted";
 
   return (
     <motion.div 
@@ -278,39 +276,39 @@ const PublicReviewPage: React.FC = () => {
       alert("This business is currently inactive.");
       return;
     }
-    if (!businessId) {
+    if (!businessId || !ownerId) {
       alert("Error: Business information missing. Please try again later.");
       return;
     }
 
     setSubmitting(true);
     try {
-      const targetTable = rating >= 4 ? 'reviews' : 'private_reviews';
-      
-      const insertData: any = {
-        business_id: businessId,
-        rating: rating,
-        feedback: comment,
-        created_at: new Date().toISOString()
-      };
+      // Send all reviews to the reviews table via fetch as requested by user
+      const response = await fetch('https://senkiwubyxeozgvycwjo.supabase.co/rest/v1/reviews', {
+        method: 'POST',
+        headers: {
+          'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNlbmtpd3VieXhlb3pndnljd2pvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU5NjQyNTMsImV4cCI6MjA4MTU0MDI1M30.97V4aCtU464P2rT6PQn57uUvDsuTpKbsF_vRW0R-3hQ',
+          'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNlbmtpd3VieXhlb3pndnljd2pvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU5NjQyNTMsImV4cCI6MjA4MTU0MDI1M30.97V4aCtU464P2rT6PQn57uUvDsuTpKbsF_vRW0R-3hQ',
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal'
+        },
+        body: JSON.stringify({
+          rating: rating,
+          feedback: comment,
+          business_id: businessId
+        })
+      });
 
-      // Only add name if it's the public reviews table (private_reviews doesn't have it)
-      if (targetTable === 'reviews') {
-        insertData.name = customerName || 'Customer';
-      } else {
-        // For private reviews, prepend name to feedback
-        insertData.feedback = `From: ${customerName || 'Anonymous'}\n\n${comment}`;
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: response.statusText }));
+        const errorMessage = errorData.message || errorData.error || errorData.description || 'Failed to submit feedback';
+        throw new Error(errorMessage);
       }
 
-      const { error } = await supabase
-        .from(targetTable)
-        .insert([insertData]);
-
-      if (error) throw error;
       setStep('success');
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error submitting review:", err);
-      alert("Failed to submit feedback. Please try again.");
+      alert(err.message || "Failed to submit feedback. Please try again");
     } finally {
       setSubmitting(false);
     }

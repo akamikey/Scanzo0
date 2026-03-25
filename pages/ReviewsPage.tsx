@@ -78,7 +78,7 @@ const ReviewCard: React.FC<ReviewCardProps> = ({ review, isPositive, isResolved,
           </div>
 
           <p className="text-gray-800 dark:text-gray-200 text-sm leading-relaxed font-medium">
-              "{review.feedback || review.comment}"
+              "{review.feedback || review.comment || review.message}"
           </p>
 
           <div className="mt-3 flex items-center gap-2 text-xs text-gray-400">
@@ -160,15 +160,23 @@ const ReviewsPage: React.FC = () => {
       
       const businessIds = businesses?.map(b => b.id) || [];
 
-      if (businessIds.length === 0) {
-          setLoading(false);
-          return;
+      // 2. Fetch both public and private reviews
+      // Both public and private reviews are fetched by business_id (owner_id column missing in both schemas).
+      let reviewsQuery = supabase.from('reviews').select('*');
+      let privateQuery = supabase.from('private_reviews').select('*');
+
+      if (businessIds.length > 0) {
+          reviewsQuery = reviewsQuery.in('business_id', businessIds);
+          privateQuery = privateQuery.in('business_id', businessIds);
+      } else {
+          // If no businesses, no reviews can be found by business_id
+          reviewsQuery = reviewsQuery.eq('id', '00000000-0000-0000-0000-000000000000'); // Dummy filter
+          privateQuery = privateQuery.eq('id', '00000000-0000-0000-0000-000000000000'); // Dummy filter
       }
 
-      // 2. Fetch both public and private reviews using business_id
       const [reviewsRes, privateRes] = await Promise.all([
-        supabase.from('reviews').select('*').in('business_id', businessIds).order('created_at', { ascending: false }),
-        supabase.from('private_reviews').select('*').in('business_id', businessIds).order('created_at', { ascending: false })
+        reviewsQuery.order('created_at', { ascending: false }),
+        privateQuery.order('created_at', { ascending: false })
       ]);
 
       if (reviewsRes.error) {
@@ -459,7 +467,7 @@ const ReviewsPage: React.FC = () => {
                                         <div className="flex items-center gap-2 text-[10px] text-gray-500 dark:text-gray-400">
                                             <span>{new Date(review.created_at).toLocaleDateString()}</span>
                                         </div>
-                                        <p className="text-gray-600 dark:text-gray-300 text-sm italic mt-2 leading-relaxed">"{review.feedback || review.comment || 'No feedback text provided'}"</p>
+                                        <p className="text-gray-600 dark:text-gray-300 text-sm italic mt-2 leading-relaxed">"{review.feedback || review.comment || review.message || 'No feedback text provided'}"</p>
                                     </div>
                                 </div>
                                 <div className="flex items-center justify-between md:justify-end gap-4 shrink-0">

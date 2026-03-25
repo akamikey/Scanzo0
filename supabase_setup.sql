@@ -20,6 +20,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- 3. Create 'owners' table (Links to Supabase Auth)
 CREATE TABLE public.owners (
     id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
+    email TEXT,
     business_name TEXT,
     public_slug TEXT UNIQUE,
     google_review_link TEXT,
@@ -88,7 +89,7 @@ CREATE TABLE public.business_links (
 -- 9. Create 'reviews' table
 CREATE TABLE public.reviews (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    owner_id UUID REFERENCES public.owners(id) ON DELETE CASCADE NOT NULL,
+    business_id UUID REFERENCES public.businesses(id) ON DELETE CASCADE NOT NULL,
     customer_name TEXT,
     rating INTEGER CHECK (rating >= 1 AND rating <= 5),
     comment TEXT,
@@ -195,7 +196,7 @@ WITH CHECK (true);
 -- Owners can view reviews for their business
 CREATE POLICY "Owners can view their own reviews" 
 ON public.reviews FOR SELECT 
-USING (auth.uid() = owner_id);
+USING (EXISTS (SELECT 1 FROM public.businesses WHERE id = business_id AND owner_id = auth.uid()));
 
 -- SUBSCRIPTIONS Policies
 -- Owners can view their own subscription status
@@ -214,7 +215,7 @@ CREATE POLICY "Users can delete their own avatar" ON storage.objects FOR DELETE 
 -- 10. Create 'private_reviews' table
 CREATE TABLE public.private_reviews (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    owner_id UUID REFERENCES public.owners(id) ON DELETE CASCADE NOT NULL,
+    business_id UUID REFERENCES public.businesses(id) ON DELETE CASCADE NOT NULL,
     customer_name TEXT,
     rating INTEGER CHECK (rating >= 1 AND rating <= 5),
     feedback TEXT,
@@ -224,7 +225,9 @@ CREATE TABLE public.private_reviews (
 ALTER TABLE public.private_reviews ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Public can insert private reviews" ON public.private_reviews FOR INSERT WITH CHECK (true);
-CREATE POLICY "Owners can view their own private reviews" ON public.private_reviews FOR SELECT USING (auth.uid() = owner_id);
+CREATE POLICY "Owners can view their own private reviews" ON public.private_reviews FOR SELECT USING (
+    EXISTS (SELECT 1 FROM public.businesses WHERE id = business_id AND owner_id = auth.uid())
+);
 
 -- 11. Create helper functions
 CREATE OR REPLACE FUNCTION public.is_subscription_active(p_owner_id uuid)

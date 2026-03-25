@@ -6,7 +6,8 @@ import { useAuth } from '../context/AuthContext';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { Review } from '../types';
-import { GoogleGenAI, Type } from '@google/genai';
+import { GoogleGenAI } from '@google/genai';
+import ReactMarkdown from 'react-markdown';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -23,6 +24,8 @@ const Dashboard: React.FC = () => {
   const [recentReviews, setRecentReviews] = useState<Review[]>([]);
   const [stats, setStats] = useState({ total: 0, avg: "0.0", positive: 0, negative: 0 });
   const [loading, setLoading] = useState(true);
+  const [insights, setInsights] = useState<string | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -77,15 +80,24 @@ const Dashboard: React.FC = () => {
         
         const businessIds = businesses?.map(b => b.id) || [];
 
-        if (businessIds.length === 0) {
-            setLoading(false);
-            return;
+        // 2. Fetch All Reviews (Public and Private)
+        // We fetch reviews that belong to one of the user's businesses.
+        // Both public and private reviews are fetched by business_id (owner_id column missing in both schemas).
+        let reviewsQuery = supabase.from('reviews').select('*');
+        let privateQuery = supabase.from('private_reviews').select('*');
+
+        if (businessIds.length > 0) {
+            reviewsQuery = reviewsQuery.in('business_id', businessIds);
+            privateQuery = privateQuery.in('business_id', businessIds);
+        } else {
+            // If no businesses, no reviews can be found by business_id
+            reviewsQuery = reviewsQuery.eq('id', '00000000-0000-0000-0000-000000000000'); // Dummy filter
+            privateQuery = privateQuery.eq('id', '00000000-0000-0000-0000-000000000000'); // Dummy filter
         }
 
-        // 2. Fetch All Reviews (Public and Private) using business_id
         const [reviewsRes, privateRes] = await Promise.all([
-            supabase.from('reviews').select('*').in('business_id', businessIds).order('created_at', { ascending: false }),
-            supabase.from('private_reviews').select('*').in('business_id', businessIds).order('created_at', { ascending: false })
+            reviewsQuery.order('created_at', { ascending: false }),
+            privateQuery.order('created_at', { ascending: false })
         ]);
 
         if (reviewsRes.error) throw reviewsRes.error;
@@ -109,12 +121,57 @@ const Dashboard: React.FC = () => {
             const negative = allReviews.filter(r => r.rating <= 3).length;
             
             setStats({ total: totalCount, avg: avgRating, positive, negative });
+
+            // Generate AI Insights if there are reviews
+            if (totalCount > 0) {
+                generateAIInsights(allReviews);
+            }
         }
 
     } catch (err) {
         console.error("Error loading dashboard:", err);
     } finally {
         setLoading(false);
+    }
+  };
+
+  const generateAIInsights = async (reviews: Review[]) => {
+    if (reviews.length === 0) return;
+    
+    setAnalyzing(true);
+    try {
+        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+        const model = "gemini-3-flash-preview";
+        
+        const reviewTexts = reviews
+            .slice(0, 20) // Analyze last 20 reviews
+            .map(r => `Rating: ${r.rating}, Feedback: ${r.feedback || r.comment || r.message}`)
+            .join('\n');
+
+        const prompt = `You are a professional business analyst. Analyze the following customer reviews and provide a structured summary with:
+1. **Overall Sentiment**: A one-sentence summary of the general customer mood.
+2. **Key Strengths**: 2-3 bullet points on what customers love.
+3. **Areas for Improvement**: 2-3 bullet points on what needs attention.
+4. **Actionable Advice**: One specific recommendation for the business owner.
+
+Keep it professional, concise, and constructive.
+
+Reviews:
+${reviewTexts}`;
+
+        const result = await ai.models.generateContent({
+            model,
+            contents: [{ parts: [{ text: prompt }] }]
+        });
+
+        if (result.text) {
+            setInsights(result.text);
+        }
+    } catch (err) {
+        console.error("Error generating AI insights:", err);
+        setInsights("Unable to generate insights at this time.");
+    } finally {
+        setAnalyzing(false);
     }
   };
 
@@ -281,7 +338,7 @@ const Dashboard: React.FC = () => {
                           </div>
                         </div>
                         <p className="mt-3 text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
-                          "{review.feedback || review.comment || 'No feedback text provided'}"
+                          "{review.feedback || review.comment || review.message || 'No feedback text provided'}"
                         </p>
                       </div>
                     ))}
@@ -305,6 +362,31 @@ const Dashboard: React.FC = () => {
                    <span className="text-xs text-blue-100">Based on {stats.total} reviews</span>
                  </div>
               </div>
+           </GlassCard>
+
+           <GlassCard delay={0.7} className="overflow-hidden">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="p-1.5 bg-purple-100 dark:bg-purple-500/20 rounded-lg text-purple-600 dark:text-purple-400">
+                  <Zap size={18} />
+                </div>
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white">AI Insights</h3>
+              </div>
+              
+              {analyzing ? (
+                <div className="space-y-3 animate-pulse">
+                  <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-full"></div>
+                  <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-5/6"></div>
+                  <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-4/6"></div>
+                </div>
+              ) : insights ? (
+                <div className="text-sm text-gray-600 dark:text-gray-300 prose dark:prose-invert prose-sm max-w-none">
+                  <ReactMarkdown>{insights}</ReactMarkdown>
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500 dark:text-gray-400 italic">
+                  Collect more reviews to unlock AI-powered insights.
+                </p>
+              )}
            </GlassCard>
         </div>
       </div>
