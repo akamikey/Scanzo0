@@ -190,15 +190,15 @@ const getCleanPlanId = (envVar: string | undefined, fallback: string) => {
 
 const PLAN_CONFIG: Record<string, { id: string | undefined, total_count: number }> = {
   'monthly': { 
-    id: getCleanPlanId(process.env.RAZORPAY_PLAN_MONTHLY, 'plan_STxKdWOYODRHqL'),
+    id: getCleanPlanId(process.env.RAZORPAY_PLAN_MONTHLY, 'plan_SVVP7NfadsPhgb'),
     total_count: 120 // 10 years
   },
   'biannual': { 
-    id: getCleanPlanId(process.env.RAZORPAY_PLAN_BIANNUAL, 'plan_STxMY7FBbIvQcJ'),
+    id: getCleanPlanId(process.env.RAZORPAY_PLAN_BIANNUAL, 'plan_SVVTUMhJomsRSD'),
     total_count: 20 // 10 years (6 months * 20 = 120 months)
   },
   'annual': { 
-    id: getCleanPlanId(process.env.RAZORPAY_PLAN_ANNUAL, 'plan_SUIxB3anFaPXYG'),
+    id: getCleanPlanId(process.env.RAZORPAY_PLAN_ANNUAL, 'plan_SVVV0PIfP8o8Il'),
     total_count: 10 // 10 years
   },
   'test': {

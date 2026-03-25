@@ -133,13 +133,36 @@ const SubscribePage: React.FC = () => {
     }
 
     try {
+      // 1. Create subscription on the backend
+      const response = await fetch('/api/create-subscription', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          planId: plan.id,
+          userId: user.id
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to create subscription');
+      }
+
+      // If it's a fallback link, just redirect
+      if (data.is_fallback && data.short_url) {
+        window.location.href = data.short_url;
+        return;
+      }
+
+      // 2. Open Razorpay checkout with the subscription ID
       const options = {
-        key: "rzp_live_STxlKmH3jUfhCg",
-        subscription_id: null,
-        subscription: true,
-        plan_id: plan.planId,
+        key: data.key_id || "rzp_live_STxlKmH3jUfhCg", // Fallback to default if not provided
+        subscription_id: data.id,
         name: "Scanzo",
-        description: "Subscription",
+        description: `${plan.name} Subscription`,
         handler: function (response: any) {
           navigate(`/subscribe?razorpay_payment_id=${response.razorpay_payment_id}&plan=${plan.id}`, { replace: true });
         },
@@ -161,7 +184,10 @@ const SubscribePage: React.FC = () => {
       rzp.open();
     } catch (error: any) {
       console.error('Payment error:', error);
-      alert("Payment failed to open.");
+      setErrorDetails({
+        message: 'Payment Initialization Failed',
+        details: error.message
+      });
       setProcessingId(null);
     }
   };

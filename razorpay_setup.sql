@@ -111,19 +111,19 @@ BEGIN
   END IF;
 
   -- Determine Plan Details
-  IF p_plan_id = 'starter' OR p_plan_id = 'plan_STxKdWOYODRHqL' THEN
+  IF p_plan_id = 'starter' OR p_plan_id = 'plan_SVVP7NfadsPhgb' THEN
     v_duration_days := 30;
     v_plan_name := 'Monthly';
     v_amount := 250;
-  ELSIF p_plan_id = 'monthly' OR p_plan_id = 'plan_STxKdWOYODRHqL' THEN
+  ELSIF p_plan_id = 'monthly' OR p_plan_id = 'plan_SVVP7NfadsPhgb' THEN
     v_duration_days := 30;
     v_plan_name := 'Monthly';
     v_amount := 250;
-  ELSIF p_plan_id = 'biannual' OR p_plan_id = 'plan_STxMY7FBbIvQcJ' THEN
+  ELSIF p_plan_id = 'biannual' OR p_plan_id = 'plan_SVVTUMhJomsRSD' THEN
     v_duration_days := 180;
     v_plan_name := '6 Months';
     v_amount := 1250;
-  ELSIF p_plan_id = 'annual' OR p_plan_id = 'plan_SUIxB3anFaPXYG' THEN
+  ELSIF p_plan_id = 'annual' OR p_plan_id = 'plan_SVVV0PIfP8o8Il' THEN
     v_duration_days := 365;
     v_plan_name := 'Yearly';
     v_amount := 2500;
