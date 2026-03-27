@@ -16,18 +16,18 @@ async function main() {
     });
     
     const schema = response.data;
-    console.log('--- Schema for private_reviews ---');
-    if (schema.definitions && schema.definitions.private_reviews) {
-      console.log('private_reviews properties:', Object.keys(schema.definitions.private_reviews.properties));
+    console.log('--- Schema for owners ---');
+    if (schema.definitions && schema.definitions.owners) {
+      console.log('owners properties:', Object.keys(schema.definitions.owners.properties));
     } else {
-      console.log('private_reviews not found in schema definitions.');
+      console.log('owners not found in schema definitions.');
     }
 
-    console.log('\n--- Schema for reviews ---');
-    if (schema.definitions && schema.definitions.reviews) {
-      console.log('reviews properties:', Object.keys(schema.definitions.reviews.properties));
+    console.log('\n--- Schema for businesses ---');
+    if (schema.definitions && schema.definitions.businesses) {
+      console.log('businesses properties:', Object.keys(schema.definitions.businesses.properties));
     } else {
-      console.log('reviews not found in schema definitions.');
+      console.log('businesses not found in schema definitions.');
     }
   } catch (error: any) {
     console.error('Error fetching schema:', error.message);

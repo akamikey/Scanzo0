@@ -7,6 +7,7 @@ import QrCodePage from './pages/QrCodePage';
 import SettingsPage from './pages/SettingsPage';
 import Insights from './pages/Insights';
 import GoogleLinkPage from './pages/GoogleLinkPage';
+import ReviewsPage from './pages/ReviewsPage';
 import PublicReviewPage from './pages/PublicReviewPage';
 import LandingPage from './pages/LandingPage';
 import AboutPage from './pages/AboutPage';
@@ -55,6 +56,7 @@ const BottomNav = () => {
   const location = useLocation();
   const navItems = [
     { path: '/dashboard', icon: Home, label: 'Home' },
+    { path: '/reviews', icon: Star, label: 'Reviews' },
     { path: '/insights', icon: BarChart2, label: 'Insights' },
     { path: '/qr-code', icon: QrCode, label: 'QR' },
     { path: '/google-link', icon: LinkIcon, label: 'Link' },
@@ -113,6 +115,7 @@ const AnimatedRoutes = () => {
         <Route path="/terms" element={<PageWrapper><TermsPage /></PageWrapper>} />
         <Route path="/logo" element={<PageWrapper><LogoPage /></PageWrapper>} />
         <Route path="/dashboard" element={<PageWrapper><Dashboard /></PageWrapper>} />
+        <Route path="/reviews" element={<PageWrapper><ReviewsPage /></PageWrapper>} />
         <Route path="/insights" element={<PageWrapper><Insights /></PageWrapper>} />
         <Route path="/qr-code" element={<PageWrapper><QrCodePage /></PageWrapper>} />
         <Route path="/google-link" element={<PageWrapper><GoogleLinkPage /></PageWrapper>} />
@@ -142,7 +145,7 @@ const Layout = () => {
   const location = useLocation();
   
   // Define protected routes that REQUIRE authentication
-  const protectedRoutes = ['/dashboard', '/insights', '/qr-code', '/google-link', '/subscribe', '/settings'];
+  const protectedRoutes = ['/dashboard', '/reviews', '/insights', '/qr-code', '/google-link', '/subscribe', '/settings'];
   const isProtectedRoute = protectedRoutes.some(path => location.pathname.startsWith(path));
   
   // Define landing/info pages that are public

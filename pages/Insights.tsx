@@ -15,7 +15,7 @@ interface ChartData {
 
 const Insights: React.FC = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, handleAuthError } = useAuth();
   const [loading, setLoading] = useState(true);
   const [chartData, setChartData] = useState<ChartData[]>([]);
 
@@ -26,11 +26,27 @@ const Insights: React.FC = () => {
 
   const fetchInsightsData = async () => {
     try {
-      // 1. Fetch business IDs for the user
-      const { data: businesses } = await supabase
+      // 1. Initialize empty data for the last 7 days
+      const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      const initial7Days: ChartData[] = [];
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        initial7Days.push({
+          name: days[d.getDay()],
+          reviews: 0,
+          rating: 0
+        });
+      }
+      setChartData(initial7Days);
+
+      // 2. Fetch business IDs for the user
+      const { data: businesses, error: bError } = await supabase
         .from('businesses')
         .select('id')
         .eq('owner_id', user?.id);
+      
+      if (bError) throw bError;
       
       const businessIds = businesses?.map(b => b.id) || [];
 
@@ -39,7 +55,7 @@ const Insights: React.FC = () => {
         return;
       }
 
-      // 2. Fetch reviews from the last 7 days (both public and private)
+      // 3. Fetch reviews from the last 7 days (both public and private)
       const sevenDaysAgo = new Date();
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
       sevenDaysAgo.setHours(0, 0, 0, 0);
@@ -64,8 +80,7 @@ const Insights: React.FC = () => {
 
       const allReviews = [...(reviewsRes.data || []), ...(privateRes.data || [])];
 
-      // 3. Process data for the last 7 days
-      const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      // 4. Process data for the last 7 days
       const last7Days: ChartData[] = [];
 
       for (let i = 6; i >= 0; i--) {
@@ -74,7 +89,7 @@ const Insights: React.FC = () => {
         const dayName = days[d.getDay()];
         const dateStr = d.toISOString().split('T')[0];
 
-        const dayReviews = allReviews?.filter(r => r.created_at.startsWith(dateStr)) || [];
+        const dayReviews = allReviews?.filter(r => r.created_at && String(r.created_at).startsWith(dateStr)) || [];
         const avgRating = dayReviews.length > 0 
           ? dayReviews.reduce((acc, curr) => acc + curr.rating, 0) / dayReviews.length 
           : 0;
@@ -88,7 +103,10 @@ const Insights: React.FC = () => {
 
       setChartData(last7Days);
     } catch (err) {
-      console.error("Error fetching insights:", err);
+      const handled = await handleAuthError(err);
+      if (!handled) {
+        console.error("Error fetching insights:", err);
+      }
     } finally {
       setLoading(false);
     }

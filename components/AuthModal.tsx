@@ -135,6 +135,11 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen }) => {
               />
             </div>
 
+            <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 text-[10px] leading-tight">
+              <p className="font-bold uppercase mb-1">⚠️ Important Security Note:</p>
+              <p>Your password can only be created once. If you lose it, your account access will be gone forever. Please use a password you know and store it securely.</p>
+            </div>
+
             <button
               type="submit"
               disabled={loading}

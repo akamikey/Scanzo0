@@ -15,51 +15,69 @@ const PosterPreviewModal: React.FC<{ isOpen: boolean, onClose: () => void, busin
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+        className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-4"
         onClick={onClose}
       >
         <motion.div 
           initial={{ scale: 0.9, opacity: 0, y: 20 }}
           animate={{ scale: 1, opacity: 1, y: 0 }}
           exit={{ scale: 0.9, opacity: 0, y: 20 }}
-          className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto relative"
+          className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-[3rem] shadow-2xl w-full max-w-lg max-h-[95vh] overflow-y-auto relative border border-white/10"
           onClick={e => e.stopPropagation()}
         >
           <button 
             onClick={onClose}
-            className="absolute top-6 right-6 p-2 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors z-10"
+            className="absolute top-8 right-8 p-3 bg-white/10 hover:bg-white/20 rounded-full transition-colors z-10 backdrop-blur-sm"
           >
-            <X size={20} className="text-gray-500" />
+            <X size={20} className="text-white" />
           </button>
 
-          <div className="p-6 sm:p-8 md:p-12 flex flex-col items-center text-center space-y-6 sm:space-y-8">
+          <div className="p-10 md:p-16 flex flex-col items-center text-center">
+            {/* Logo Section */}
             {logoUrl && (
-              <div className="w-20 h-20 rounded-2xl overflow-hidden shadow-lg border-2 border-white -mb-4">
-                <img src={logoUrl} alt="Logo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+              <div className="mb-8">
+                <img src={logoUrl} alt="Business Logo" className="w-24 h-24 rounded-full object-cover border-4 border-white/10 shadow-lg" />
               </div>
             )}
-            <div className="space-y-2">
-              <h3 className="text-3xl font-black text-slate-800 uppercase tracking-tight leading-none">
+
+            {/* Top Section */}
+            <div className="space-y-4 mb-12">
+              <h3 className="text-4xl md:text-5xl font-black text-white tracking-tight leading-tight">
                 {businessName}
               </h3>
-              <div className="flex justify-center gap-1 text-amber-400">
-                {[...Array(5)].map((_, i) => <Star key={i} size={24} className="fill-current" />)}
+              <p className="text-lg text-slate-300 font-medium">
+                Scan to explore our services
+              </p>
+            </div>
+
+            {/* QR Code Section */}
+            <div className="relative group mb-12">
+              <div className="absolute -inset-4 bg-white/5 rounded-[3rem] blur-2xl group-hover:opacity-100 transition-opacity opacity-0" />
+              <div className="relative bg-white p-8 rounded-[3rem] shadow-2xl border border-white/10">
+                <img src={qrUrl} alt="QR Code" className="w-56 h-56 md:w-72 md:h-72 object-contain" />
               </div>
             </div>
 
-            <div className="bg-white p-6 rounded-3xl shadow-xl border border-gray-100">
-              <img src={qrUrl} alt="QR Code" className="w-48 h-48 md:w-64 md:h-64 object-contain" />
+            {/* Features Section */}
+            <div className="space-y-4 mb-12 w-full max-w-xs">
+              <div className="flex items-center gap-4 text-slate-200 font-medium justify-center text-lg">
+                <div className="w-1.5 h-1.5 rounded-full bg-white/50" />
+                <span>View Menu / Website</span>
+              </div>
+              <div className="flex items-center gap-4 text-slate-200 font-medium justify-center text-lg">
+                <div className="w-1.5 h-1.5 rounded-full bg-white/50" />
+                <span>Leave Feedback</span>
+              </div>
+              <div className="flex items-center gap-4 text-slate-200 font-medium justify-center text-lg">
+                <div className="w-1.5 h-1.5 rounded-full bg-white/50" />
+                <span>Connect With Us</span>
+              </div>
             </div>
 
-            <div className="space-y-4">
-              <p className="text-2xl font-bold text-blue-600 leading-tight">
-                Enjoyed our service?<br />
-                Scan and leave a review!
-              </p>
-              <p className="text-[10px] font-bold tracking-[0.2em] text-slate-400 uppercase">
-                Powered by Scanzo
-              </p>
-            </div>
+            {/* Footer */}
+            <p className="text-sm font-medium text-slate-400">
+              Thank you for visiting ✨
+            </p>
           </div>
         </motion.div>
       </motion.div>
@@ -124,18 +142,12 @@ const QrCodePage: React.FC = () => {
     } finally {
       setDownloading(false);
     }
-  };
-
-  const handlePrintPoster = () => {
+  };  const handlePrintPoster = () => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
       alert("Please allow popups to print the poster.");
       return;
     }
-
-    const logoHtml = ownerData?.avatar_url 
-      ? `<img src="${ownerData.avatar_url}" class="logo" />` 
-      : '';
 
     const htmlContent = `
       <!DOCTYPE html>
@@ -143,7 +155,7 @@ const QrCodePage: React.FC = () => {
       <head>
         <title>Print QR Poster - ${businessName}</title>
         <style>
-          @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+          @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap');
           @page {
             size: A4 portrait;
             margin: 0;
@@ -152,8 +164,8 @@ const QrCodePage: React.FC = () => {
             margin: 0;
             padding: 0;
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            background-color: #f8fafc;
-            color: #1e293b;
+            background-color: #0f172a;
+            color: #ffffff;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -164,121 +176,125 @@ const QrCodePage: React.FC = () => {
           .poster-canvas {
             width: 210mm;
             height: 297mm;
-            background: white;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            padding: 40px;
+            padding: 60px;
             box-sizing: border-box;
             position: relative;
           }
-          .main-card {
+          .logo-container {
+            margin-bottom: 40px;
+          }
+          .logo-img {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 4px solid rgba(255,255,255,0.1);
+          }
+          .content-wrapper {
             width: 100%;
             height: 100%;
-            background: #ffffff;
-            border-radius: 60px;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: space-between;
-            padding: 80px 40px;
-            box-sizing: border-box;
-            box-shadow: 0 50px 100px -20px rgba(0,0,0,0.05);
-            border: 1px solid #f1f5f9;
+            text-align: center;
+            padding: 40px 0;
           }
           .header {
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 24px;
-          }
-          .logo {
-            width: 140px;
-            height: 140px;
-            object-fit: cover;
-            border-radius: 40px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.08);
+            gap: 20px;
           }
           .business-name {
-            font-size: 64px;
+            font-size: 84px;
             font-weight: 900;
-            letter-spacing: -0.04em;
-            color: #0f172a;
+            letter-spacing: -0.05em;
+            color: #ffffff;
             margin: 0;
-            text-align: center;
+            line-height: 1;
           }
-          .stars {
-            display: flex;
-            gap: 8px;
-            color: #fbbf24;
-            font-size: 48px;
+          .subtext {
+            font-size: 32px;
+            font-weight: 500;
+            color: #cbd5e1;
+            margin: 0;
           }
           .qr-section {
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 32px;
+            justify-content: center;
           }
           .qr-container {
             background: #ffffff;
-            padding: 40px;
-            border-radius: 50px;
-            box-shadow: 0 30px 60px -12px rgba(0,0,0,0.08);
-            border: 1px solid #f1f5f9;
+            padding: 50px;
+            border-radius: 80px;
+            box-shadow: 0 40px 80px -15px rgba(0,0,0,0.5);
+            border: 1px solid rgba(255,255,255,0.1);
           }
           .qr-image {
-            width: 450px;
-            height: 450px;
+            width: 500px;
+            height: 500px;
             display: block;
           }
-          .cta-text {
-            font-size: 48px;
-            font-weight: 800;
-            letter-spacing: -0.02em;
-            color: #2563eb;
-            margin: 0;
-            line-height: 1.1;
-          }
-          .footer {
+          .features-list {
             display: flex;
             flex-direction: column;
             align-items: center;
+            gap: 24px;
+            margin-top: 40px;
+          }
+          .feature-item {
+            font-size: 28px;
+            font-weight: 500;
+            color: #e2e8f0;
+            display: flex;
+            align-items: center;
             gap: 16px;
           }
-          .instruction {
-            font-size: 24px;
-            font-weight: 600;
-            color: #64748b;
+          .dot {
+            width: 8px;
+            height: 8px;
+            background-color: rgba(255,255,255,0.5);
+            border-radius: 50%;
           }
-          .branding {
-            font-size: 16px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.3em;
-            color: #cbd5e1;
+          .footer {
+            font-size: 20px;
+            font-weight: 500;
+            color: #64748b;
+            margin-top: 40px;
           }
         </style>
       </head>
       <body>
         <div class="poster-canvas">
-          <div class="main-card">
+          <div class="content-wrapper">
             <div class="header">
-              ${logoHtml}
+              ${ownerData?.logo_url ? `<div class="logo-container"><img src="${ownerData.logo_url}" class="logo-img" /></div>` : ''}
               <h1 class="business-name">${businessName}</h1>
-              <div class="stars">★★★★★</div>
+              <p class="subtext">Scan to explore our services</p>
             </div>
 
             <div class="qr-section">
-              <h2 class="cta-text">Scan to Review</h2>
               <div class="qr-container">
                 <img src="${qrApiUrl}" class="qr-image" onload="window.print(); window.onafterprint = function(){ window.close(); }" />
               </div>
             </div>
 
+            <div class="features-list">
+              <div class="feature-item"><div class="dot"></div> View Menu / Website</div>
+              <div class="feature-item"><div class="dot"></div> Leave Feedback</div>
+              <div class="feature-item"><div class="dot"></div> Connect With Us</div>
+            </div>
+
             <div class="footer">
-              <p class="instruction">Point your camera at the QR code</p>
-              <div class="branding">Powered by Scanzo</div>
+              Thank you for visiting ✨
             </div>
           </div>
         </div>
@@ -298,7 +314,7 @@ const QrCodePage: React.FC = () => {
         onClose={() => setShowPreview(false)} 
         businessName={businessName} 
         qrUrl={qrApiUrl} 
-        logoUrl={ownerData?.avatar_url}
+        logoUrl={ownerData?.logo_url}
       />
 
       <div className="flex items-center gap-4">

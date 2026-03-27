@@ -4,7 +4,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import PublicNavbar from '../components/PublicNavbar';
 import { ScanzoLogo } from '../components/ScanzoLogo';
 import { useAuth } from '../context/AuthContext';
-import { Star, ArrowRight, CheckCircle2, QrCode, Globe, Layout, MessageSquare } from 'lucide-react';
+import { Star, ArrowRight, CheckCircle2, QrCode, Globe, Layout, MessageSquare, Printer, Building2 } from 'lucide-react';
 
 import PublicFooter from '../components/PublicFooter';
 
@@ -81,7 +81,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ isDark, toggleTheme }) => {
 
             {/* Visual Concept: Modern UI Cards */}
             <div className="relative w-full max-w-5xl mx-auto mt-12 grid grid-cols-1 md:grid-cols-3 gap-6">
-              {/* Card 1: Reviews */}
+              {/* Card 1: Reviews Dashboard */}
               <motion.div 
                 initial={{ opacity: 0, x: -50 }}
                 animate={{ opacity: 1, x: 0 }}
@@ -89,10 +89,10 @@ const LandingPage: React.FC<LandingPageProps> = ({ isDark, toggleTheme }) => {
                 className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-white/5 shadow-xl shadow-slate-200/50 dark:shadow-none flex flex-col items-start text-left"
               >
                 <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center mb-4">
-                  <Star className="text-blue-600 w-6 h-6" />
+                  <Layout className="text-blue-600 w-6 h-6" />
                 </div>
-                <h3 className="text-lg font-bold mb-2">Smart Reviews</h3>
-                <p className="text-sm text-slate-500 dark:text-slate-400">Boost your Google ranking with automated review collection.</p>
+                <h3 className="text-lg font-bold mb-2">Reviews Dashboard</h3>
+                <p className="text-sm text-slate-500 dark:text-slate-400">Monitor your reputation with a powerful dashboard. Filter by star rating and track positive vs negative feedback in real-time.</p>
               </motion.div>
 
               {/* Card 2: QR Center */}
@@ -123,6 +123,152 @@ const LandingPage: React.FC<LandingPageProps> = ({ isDark, toggleTheme }) => {
                 <p className="text-sm text-slate-500 dark:text-slate-400">Menus, links, and services all accessible through a single, elegant interface.</p>
               </motion.div>
             </div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* Reviews Dashboard Feature Section */}
+      <section className="py-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto overflow-hidden">
+        <div className="grid md:grid-cols-2 gap-16 items-center">
+          <motion.div
+            initial={{ opacity: 0, x: -50 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            className="space-y-8"
+          >
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 font-bold text-sm">
+              <Star className="w-4 h-4 fill-current" />
+              NEW: REVIEWS DASHBOARD
+            </div>
+            <h2 className="text-4xl md:text-6xl font-black text-slate-900 dark:text-white leading-[1.1]">
+              Master Your <br />
+              <span className="text-blue-600">Online Reputation.</span>
+            </h2>
+            <p className="text-xl text-slate-500 dark:text-slate-400 leading-relaxed">
+              Our new Reviews Dashboard gives you total control over customer feedback. Track your growth, filter by rating, and respond to your customers instantly.
+            </p>
+            <ul className="space-y-4">
+              {[
+                'Real-time positive & negative review tracking',
+                'One-click star rating filters',
+                'Detailed feedback history with timestamps',
+                'Mobile-responsive management on the go'
+              ].map((item) => (
+                <li key={item} className="flex items-center gap-3 text-slate-700 dark:text-slate-300 font-bold">
+                  <div className="w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                  </div>
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, x: 50 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            className="relative"
+          >
+            {/* Mock Dashboard UI */}
+            <div className="bg-slate-100 dark:bg-slate-800 p-4 rounded-[2.5rem] shadow-2xl border border-slate-200 dark:border-white/5">
+              <div className="bg-white dark:bg-slate-900 rounded-[2rem] p-6 space-y-6">
+                <div className="flex justify-between items-center">
+                  <div className="h-4 w-32 bg-slate-100 dark:bg-slate-800 rounded-full" />
+                  <div className="flex gap-1">
+                    {[1,2,3,4,5].map(i => <Star key={i} size={12} className="text-yellow-400 fill-yellow-400" />)}
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="h-24 bg-green-50 dark:bg-green-900/20 rounded-2xl border border-green-100 dark:border-green-900/30 p-4">
+                    <div className="h-3 w-12 bg-green-200 dark:bg-green-800 rounded-full mb-2" />
+                    <div className="h-6 w-8 bg-green-600 rounded-lg" />
+                  </div>
+                  <div className="h-24 bg-red-50 dark:bg-red-900/20 rounded-2xl border border-red-100 dark:border-red-900/30 p-4">
+                    <div className="h-3 w-12 bg-red-200 dark:bg-red-800 rounded-full mb-2" />
+                    <div className="h-6 w-8 bg-red-600 rounded-lg" />
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  {[1, 2].map(i => (
+                    <div key={i} className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-white/5">
+                      <div className="h-3 w-24 bg-slate-200 dark:bg-slate-700 rounded-full mb-2" />
+                      <div className="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            {/* Decorative blobs */}
+            <div className="absolute -top-12 -right-12 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl -z-10" />
+            <div className="absolute -bottom-12 -left-12 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl -z-10" />
+          </motion.div>
+        </div>
+      </section>
+
+      {/* QR Poster Feature Section */}
+      <section className="py-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto overflow-hidden bg-slate-50 dark:bg-slate-900/50 rounded-[3rem] my-12">
+        <div className="grid md:grid-cols-2 gap-16 items-center">
+          <motion.div
+            initial={{ opacity: 0, x: -50 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            className="order-2 md:order-1 relative"
+          >
+            {/* Mock QR Poster UI */}
+            <div className="bg-gradient-to-br from-slate-900 to-slate-800 p-8 rounded-[3rem] shadow-2xl border border-white/10 flex flex-col items-center text-center aspect-[3/4] justify-center max-w-sm mx-auto transform -rotate-2 hover:rotate-0 transition-transform duration-500">
+              <div className="w-16 h-16 rounded-full bg-white/10 border-2 border-white/20 mb-6 flex items-center justify-center">
+                <Building2 className="text-white/50" size={24} />
+              </div>
+              <h3 className="text-3xl font-black text-white mb-2">Your Business</h3>
+              <p className="text-slate-400 text-sm mb-8">Scan to explore our services</p>
+              <div className="bg-white p-4 rounded-3xl shadow-2xl mb-8 relative group">
+                <div className="absolute -inset-4 bg-white/5 rounded-[2rem] blur-xl opacity-0 group-hover:opacity-100 transition-opacity" />
+                <QrCode className="w-32 h-32 text-slate-900 relative z-10" />
+              </div>
+              <div className="space-y-3">
+                <div className="flex items-center gap-3 text-slate-300 text-xs justify-center font-medium">
+                  <div className="w-1.5 h-1.5 rounded-full bg-white/50" /> View Menu / Website
+                </div>
+                <div className="flex items-center gap-3 text-slate-300 text-xs justify-center font-medium">
+                  <div className="w-1.5 h-1.5 rounded-full bg-white/50" /> Leave Feedback
+                </div>
+              </div>
+            </div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, x: 50 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            className="space-y-8 order-1 md:order-2"
+          >
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 font-bold text-sm">
+              <Printer className="w-4 h-4" />
+              PREMIUM BRANDING
+            </div>
+            <h2 className="text-4xl md:text-6xl font-black text-slate-900 dark:text-white leading-[1.1]">
+              Beautiful, Custom <br />
+              <span className="text-indigo-600">QR Posters.</span>
+            </h2>
+            <p className="text-xl text-slate-500 dark:text-slate-400 leading-relaxed">
+              Generate stunning, Apple-quality QR posters instantly. Upload your logo, customize your business name, and print high-resolution marketing materials that look professional and premium.
+            </p>
+            <ul className="space-y-4">
+              {[
+                'Minimalist, premium design aesthetic',
+                'Upload your own business logo',
+                'High-resolution print-ready downloads',
+                'No app branding or watermarks'
+              ].map((item) => (
+                <li key={item} className="flex items-center gap-3 text-slate-700 dark:text-slate-300 font-bold">
+                  <div className="w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center">
+                    <CheckCircle2 className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                  </div>
+                  {item}
+                </li>
+              ))}
+            </ul>
           </motion.div>
         </div>
       </section>
@@ -229,6 +375,22 @@ const LandingPage: React.FC<LandingPageProps> = ({ isDark, toggleTheme }) => {
               </motion.button>
             </motion.div>
           ))}
+        </div>
+      </section>
+
+      {/* Security Warning Section */}
+      <section className="py-16 px-4 bg-amber-50 dark:bg-amber-900/10 border-y border-amber-100 dark:border-amber-900/20">
+        <div className="max-w-4xl mx-auto text-center">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 font-bold text-sm mb-6">
+            ⚠️ CRITICAL SECURITY NOTICE
+          </div>
+          <h2 className="text-3xl font-black text-slate-900 dark:text-white mb-6">Your Password is Your Only Key</h2>
+          <p className="text-lg text-slate-600 dark:text-slate-400 leading-relaxed max-w-2xl mx-auto">
+            At Scanzo, we prioritize absolute security. Your password can only be created <strong>once</strong>. 
+            If you lose or forget it, your account access will be <strong>lost forever</strong>. 
+            We do not provide password recovery services to ensure your business data remains exclusively yours. 
+            Please use a password you know and store it safely.
+          </p>
         </div>
       </section>
 

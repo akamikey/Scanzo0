@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { motion } from 'framer-motion';
+import { useAuth } from '../context/AuthContext';
 import { 
   Building2, 
   Image as ImageIcon, 
@@ -16,6 +17,7 @@ import clsx from 'clsx';
 
 export default function BusinessBuilder() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -42,14 +44,13 @@ export default function BusinessBuilder() {
   }, []);
 
   const fetchData = async () => {
+    if (!user) {
+      navigate('/');
+      return;
+    }
+    
     setLoading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        navigate('/');
-        return;
-      }
-
       // Fetch business page
       const { data: pageData, error: pageError } = await supabase
         .from('business_pages')
@@ -94,10 +95,9 @@ export default function BusinessBuilder() {
   };
 
   const handleFileUpload = async (file: File, bucket: string, field: 'logo_url' | 'cover_url') => {
+    if (!user) return;
+    
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
       const fileExt = file.name.split('.').pop();
       const fileName = `${user.id}-${Math.random()}.${fileExt}`;
       const filePath = `${fileName}`;
@@ -119,10 +119,9 @@ export default function BusinessBuilder() {
   };
 
   const handleGalleryUpload = async (file: File) => {
+    if (!user) return;
+    
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
       const fileExt = file.name.split('.').pop();
       const fileName = `${user.id}-${Math.random()}.${fileExt}`;
       const filePath = `${fileName}`;
@@ -164,14 +163,16 @@ export default function BusinessBuilder() {
   };
 
   const handleSave = async () => {
+    if (!user) {
+      setError('Not authenticated');
+      return;
+    }
+    
     setSaving(true);
     setError(null);
     setSuccess(false);
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
-
       // Save Business Page
       let pageId = businessPage.id;
       const pageData = {

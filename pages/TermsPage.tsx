@@ -30,8 +30,8 @@ const TermsPage: React.FC = () => {
             </section>
 
             <section>
-              <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-4">3. User Responsibilities</h2>
-              <p>You are responsible for maintaining the confidentiality of your account and password. You agree to notify us immediately of any unauthorized use of your account.</p>
+              <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-4">3. User Responsibilities & Security</h2>
+              <p>You are responsible for maintaining the confidentiality of your account and password. <strong>CRITICAL SECURITY NOTE:</strong> Your password can only be created once. If you lose or forget your password, your account access will be lost forever. We do not provide password recovery services for security reasons. You agree to notify us immediately of any unauthorized use of your account.</p>
             </section>
 
             <section>

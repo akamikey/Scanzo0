@@ -60,7 +60,7 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar }) => {
     try {
         const { error } = await supabase
             .from('owners')
-            .update({ avatar_url: null })
+            .update({ logo_url: null })
             .eq('id', user.id);
         
         if (error) {
@@ -126,7 +126,7 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar }) => {
         if (!usedLocalStorage) {
             const { error: updateError } = await supabase
                 .from('owners')
-                .update({ avatar_url: finalUrl })
+                .update({ logo_url: finalUrl })
                 .eq('id', user?.id);
 
             if (updateError) {
@@ -161,7 +161,7 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar }) => {
     navigate('/');
   };
 
-  const displayAvatar = localAvatar || ownerData?.avatar_url || `https://ui-avatars.com/api/?name=${user?.email || 'User'}&background=random`;
+  const displayAvatar = localAvatar || ownerData?.logo_url || `https://ui-avatars.com/api/?name=${user?.email || 'User'}&background=random`;
   
   // Calculate remaining days
   const getRemainingDays = () => {
@@ -296,7 +296,7 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar }) => {
                     Upload Logo
                   </button>
 
-                  {(localAvatar || ownerData?.avatar_url) && (
+                  {(localAvatar || ownerData?.logo_url) && (
                     <button
                       onClick={handleRemoveAvatar}
                       className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-xl transition-colors"
