@@ -521,16 +521,7 @@ const PublicBusinessPage: React.FC = () => {
           </div>
         </div>
       )}
-      {/* Footer */}
-      <div className="max-w-4xl mx-auto px-6 mt-20 pb-12 flex flex-col items-center justify-center border-t border-gray-200 dark:border-white/10 pt-12">
-        <div className="flex items-center gap-2 mb-2">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-500/20">
-            <div className="w-4 h-4 border-2 border-white rounded-sm rotate-45" />
-          </div>
-          <span className="text-xl font-black text-gray-900 dark:text-white tracking-tighter">Scanzo</span>
-        </div>
-        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Powered by Scanzo</p>
-      </div>
+      {/* Footer Removed */}
     </div>
   );
 };
