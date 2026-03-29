@@ -26,7 +26,7 @@ interface AuthContextType {
   subscription: SubscriptionData | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
-  signUp: (email: string, password: string, businessName: string, reviewLink: string) => Promise<{ error: any }>;
+  signUp: (email: string, password: string, businessName: string, reviewLink: string) => Promise<{ error: any, needsEmailVerification?: boolean }>;
   signOut: () => Promise<void>;
   refreshData: () => Promise<void>;
   handleAuthError: (error: any) => Promise<boolean>;
@@ -111,6 +111,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       
       let finalOwnerData = owner || null;
+
+      // Handle delayed owner creation (e.g., after email verification or Google OAuth)
+      if (!finalOwnerData) {
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        if (currentUser && currentUser.id === userId) {
+          // Use businessName from metadata (email signup) or fallback to Google name/email
+          const businessName = currentUser.user_metadata?.businessName || currentUser.user_metadata?.full_name || currentUser.email?.split('@')[0] || 'My Business';
+          const reviewLink = currentUser.user_metadata?.reviewLink || '';
+          const slug = businessName.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + crypto.randomUUID().slice(0, 6);
+          
+          const { data: newOwner, error: createError } = await supabase.from('owners').insert({
+            id: userId,
+            business_name: businessName,
+            public_slug: slug,
+          }).select().single();
+
+          if (!createError && newOwner) {
+            finalOwnerData = newOwner;
+            await supabase.from('businesses').insert({
+              owner_id: userId,
+              name: businessName,
+              review_link: reviewLink
+            });
+            
+            // Clear metadata to prevent re-running this if they delete their owner record
+            if (currentUser.user_metadata?.businessName) {
+              await supabase.auth.updateUser({ data: { businessName: null, reviewLink: null } });
+            }
+          }
+        }
+      }
 
       // 2. Fetch Business Data (Primary Source for Link)
       if (finalOwnerData) {
@@ -478,35 +509,50 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const { data: authData, error: authError } = await retryAuthCall(() => supabase.auth.signUp({
       email,
       password,
+      options: {
+        data: {
+          businessName,
+          reviewLink
+        }
+      }
     }));
 
     if (authError) return { error: authError };
     if (!authData?.user) return { error: { message: "User creation failed" } };
 
-    const slug = businessName.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + crypto.randomUUID().slice(0, 6);
-
-    const { error: dbError } = await supabase.from('owners').insert({
-      id: authData.user.id,
-      business_name: businessName,
-      public_slug: slug,
-    });
-
-    if (dbError) {
-        console.error("DB Create Error:", dbError);
-        return { error: dbError };
+    // Check if user already exists (Supabase returns empty identities array for existing users to prevent email enumeration)
+    if (authData.user.identities && authData.user.identities.length === 0) {
+      return { error: { message: "An account with this email already exists. Please log in." } };
     }
 
-    // Also create business entry with review link
-    await supabase.from('businesses').insert({
-      owner_id: authData.user.id,
-      name: businessName,
-      review_link: reviewLink
-    });
+    // If email verification is enabled, authData.session will be null.
+    // We cannot insert into 'owners' table without a session due to RLS.
+    if (authData.session) {
+      const slug = businessName.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + crypto.randomUUID().slice(0, 6);
 
-    // Don't await this, let it load in the background
-    fetchDataForUser(authData.user.id).catch(err => console.warn("SignUp data fetch failed:", err));
+      const { error: dbError } = await supabase.from('owners').insert({
+        id: authData.user.id,
+        business_name: businessName,
+        public_slug: slug,
+      });
 
-    return { error: null };
+      if (dbError) {
+          console.error("DB Create Error:", dbError);
+          return { error: dbError };
+      }
+
+      // Also create business entry with review link
+      await supabase.from('businesses').insert({
+        owner_id: authData.user.id,
+        name: businessName,
+        review_link: reviewLink
+      });
+
+      // Don't await this, let it load in the background
+      fetchDataForUser(authData.user.id).catch(err => console.warn("SignUp data fetch failed:", err));
+    }
+
+    return { error: null, needsEmailVerification: !authData.session };
   };
 
   const signOut = async () => {

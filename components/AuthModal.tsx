@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Mail, Lock, Building, Link as LinkIcon, ArrowRight, Loader2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { ScanzoLogo } from './ScanzoLogo';
 import clsx from 'clsx';
 
@@ -15,6 +15,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen }) => {
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [verificationSent, setVerificationSent] = useState(false);
   const { signIn, signUp } = useAuth();
   const navigate = useNavigate();
 
@@ -37,9 +38,14 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen }) => {
         if (error) throw error;
         navigate('/dashboard');
       } else {
-        const { error } = await signUp(email, password, businessName, reviewLink);
+        const { error, needsEmailVerification } = await signUp(email, password, businessName, reviewLink);
         if (error) throw error;
-        navigate('/dashboard');
+        
+        if (needsEmailVerification) {
+          setVerificationSent(true);
+        } else {
+          navigate('/dashboard');
+        }
       }
     } catch (err: any) {
       setError(err.message || 'An error occurred');
@@ -49,27 +55,37 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-      {/* Backdrop */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-      />
+    <div className="fixed inset-0 z-[100] overflow-y-auto">
+      <div className="flex min-h-full items-center justify-center p-4">
+        {/* Backdrop */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm"
+        />
 
-      {/* Modal */}
-      <motion.div
-        initial={{ scale: 0.9, opacity: 0, y: 20 }}
-        animate={{ scale: 1, opacity: 1, y: 0 }}
-        exit={{ scale: 0.9, opacity: 0, y: 20 }}
-        className="relative w-full max-w-md bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-white/20 rounded-3xl shadow-2xl overflow-hidden"
-      >
+        {/* Modal */}
+        <motion.div
+          initial={{ scale: 0.9, opacity: 0, y: 20 }}
+          animate={{ scale: 1, opacity: 1, y: 0 }}
+          exit={{ scale: 0.9, opacity: 0, y: 20 }}
+          className="relative w-full max-w-md bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-white/20 rounded-3xl shadow-2xl overflow-hidden my-8"
+        >
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-purple-600" />
         
+        <button 
+          onClick={() => navigate('/')}
+          className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 dark:hover:text-white transition-colors rounded-full hover:bg-gray-100 dark:hover:bg-white/10 z-10"
+        >
+          <X size={20} />
+        </button>
+
         <div className="p-8">
           <div className="flex flex-col items-center mb-6 text-center">
-            <ScanzoLogo iconOnly className="mb-4" />
+            <Link to="/" className="mb-4 hover:opacity-80 transition-opacity">
+              <ScanzoLogo iconOnly />
+            </Link>
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
               {isLogin ? 'Welcome Back' : 'Get Started'}
             </h2>
@@ -84,8 +100,29 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen }) => {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {!isLogin && (
+          {verificationSent ? (
+            <div className="text-center space-y-4 py-4">
+              <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Mail size={32} />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white">Check your email</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                We've sent a verification link to <strong>{email}</strong>. Please click the link to verify your account before logging in.
+              </p>
+              <button
+                onClick={() => {
+                  setVerificationSent(false);
+                  setIsLogin(true);
+                }}
+                className="w-full py-3 px-4 mt-4 bg-gray-100 hover:bg-gray-200 dark:bg-white/5 dark:hover:bg-white/10 text-gray-900 dark:text-white font-semibold rounded-xl transition-colors"
+              >
+                Return to Login
+              </button>
+            </div>
+          ) : (
+            <>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                {!isLogin && (
               <>
                 <div className="relative">
                   <Building className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
@@ -167,8 +204,11 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen }) => {
               </button>
             </p>
           </div>
+          </>
+          )}
         </div>
       </motion.div>
+      </div>
     </div>
   );
 };

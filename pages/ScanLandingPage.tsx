@@ -214,17 +214,6 @@ export default function ScanLandingPage() {
         className="w-full max-w-sm space-y-8 relative z-10"
       >
         <div className="text-center">
-          <div className="w-24 h-24 rounded-3xl bg-white dark:bg-slate-900 shadow-xl mx-auto mb-6 overflow-hidden p-1">
-            <div className="w-full h-full rounded-2xl overflow-hidden bg-gray-50 dark:bg-slate-800 flex items-center justify-center">
-              {logoUrl ? (
-                <img src={logoUrl} alt={businessName} className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center text-blue-500">
-                  <Building2 size={40} />
-                </div>
-              )}
-            </div>
-          </div>
           <h1 className="text-2xl font-bold text-slate-800 dark:text-white tracking-tight">{businessName}</h1>
         </div>
 

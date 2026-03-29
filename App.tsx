@@ -100,6 +100,16 @@ const BottomNav = () => {
   );
 };
 
+const LoginWrapper = () => {
+  return (
+    <div className="min-h-screen bg-white dark:bg-slate-950 font-sans text-slate-900 dark:text-white overflow-x-hidden flex flex-col relative">
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] bg-blue-500/5 rounded-full blur-[120px] -z-10" />
+      <div className="absolute -top-24 -right-24 w-96 h-96 bg-purple-500/5 rounded-full blur-[100px] -z-10" />
+      <AuthModal isOpen={true} />
+    </div>
+  );
+};
+
 const AnimatedRoutes = () => {
   const location = useLocation();
   
@@ -114,6 +124,7 @@ const AnimatedRoutes = () => {
         <Route path="/privacy" element={<PageWrapper><PrivacyPage /></PageWrapper>} />
         <Route path="/terms" element={<PageWrapper><TermsPage /></PageWrapper>} />
         <Route path="/logo" element={<PageWrapper><LogoPage /></PageWrapper>} />
+        <Route path="/login" element={<PageWrapper><LoginWrapper /></PageWrapper>} />
         <Route path="/dashboard" element={<PageWrapper><Dashboard /></PageWrapper>} />
         <Route path="/reviews" element={<PageWrapper><ReviewsPage /></PageWrapper>} />
         <Route path="/insights" element={<PageWrapper><Insights /></PageWrapper>} />
@@ -149,7 +160,7 @@ const Layout = () => {
   const isProtectedRoute = protectedRoutes.some(path => location.pathname.startsWith(path));
   
   // Define landing/info pages that are public
-  const isLandingPage = location.pathname === '/' || ['/about', '/how-it-works', '/features', '/pricing', '/privacy', '/terms', '/logo'].includes(location.pathname);
+  const isLandingPage = location.pathname === '/' || ['/about', '/how-it-works', '/features', '/pricing', '/privacy', '/terms', '/logo', '/login'].includes(location.pathname);
   
   // Define direct public access routes (QR scans, reviews, etc)
   const isPublicDirectRoute = location.pathname.startsWith('/scan/') || 
@@ -169,8 +180,8 @@ const Layout = () => {
 
   // If it's a public route or landing page, render it directly without dashboard layout or auth checks
   if (isPublicDirectRoute || isLandingPage) {
-     // Redirect logged-in users from landing page to dashboard
-     if (user && location.pathname === '/') {
+     // Redirect logged-in users from landing page or login page to dashboard
+     if (user && (location.pathname === '/' || location.pathname === '/login')) {
         return <Navigate to="/dashboard" replace />;
      }
 
@@ -182,11 +193,13 @@ const Layout = () => {
      );
   }
 
+  // Redirect to login if trying to access a protected route without being logged in
+  if (isProtectedRoute && !user) {
+    return <Navigate to="/login" replace />;
+  }
+
   return (
     <div className="h-screen w-full bg-gray-50 dark:bg-slate-900 text-gray-900 dark:text-gray-100 transition-colors duration-300 relative overflow-hidden flex">
-      {/* Only show AuthModal for protected routes if NOT logged in */}
-      {isProtectedRoute && !user && <AuthModal isOpen={true} />}
-      
       <ScrollToTop />
 
       {/* Background Gradients */}
@@ -200,7 +213,7 @@ const Layout = () => {
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       {/* Main Column */}
-      <div className={`flex-1 flex flex-col h-full relative z-10 transition-all duration-300 ${user ? 'lg:pl-64' : ''} ${isProtectedRoute && !user ? 'blur-sm pointer-events-none' : ''}`}>
+      <div className={`flex-1 flex flex-col h-full relative z-10 transition-all duration-300 ${user ? 'lg:pl-64' : ''}`}>
         <Header 
           toggleSidebar={() => setSidebarOpen(!sidebarOpen)} 
         />
