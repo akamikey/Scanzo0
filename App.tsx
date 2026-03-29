@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Toaster } from 'sonner';
 import { BrowserRouter as Router, Routes, Route, useLocation, Link, useNavigate, Navigate } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
@@ -245,6 +246,7 @@ function App() {
             <Route path="*" element={<Layout />} />
           </Routes>
         </Router>
+        <Toaster position="top-center" richColors />
       </ThemeProvider>
     </AuthProvider>
   );

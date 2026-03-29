@@ -4,6 +4,7 @@ import { X, Mail, Lock, Building, Link as LinkIcon, ArrowRight, Loader2 } from '
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import { ScanzoLogo } from './ScanzoLogo';
+import { toast } from 'sonner';
 import clsx from 'clsx';
 
 interface AuthModalProps {
@@ -36,6 +37,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen }) => {
       if (isLogin) {
         const { error } = await signIn(email, password);
         if (error) throw error;
+        toast.success('Welcome back!');
         navigate('/dashboard');
       } else {
         const { error, needsEmailVerification } = await signUp(email, password, businessName, reviewLink);
@@ -44,6 +46,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen }) => {
         if (needsEmailVerification) {
           setVerificationSent(true);
         } else {
+          toast.success('Welcome to Scanzo! Your account has been created.');
           navigate('/dashboard');
         }
       }
