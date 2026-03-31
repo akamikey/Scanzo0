@@ -382,7 +382,7 @@ const PLAN_CONFIG: Record<string, { id: string | undefined, total_count: number 
     total_count: 10 // 10 years
   },
   'test': {
-    id: process.env.RAZORPAY_PLAN_TEST,
+    id: getCleanPlanId(process.env.RAZORPAY_PLAN_TEST, 'plan_SXwcV2lC1EpYOW'),
     total_count: 1 // Just 1 cycle for test
   }
 };
