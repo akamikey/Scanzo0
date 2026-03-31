@@ -19,6 +19,186 @@ const PORT = 3000;
 
 // 1. Basic Middleware
 app.use(cors());
+
+// Webhook Handler needs raw body for signature verification
+app.post('/api/webhook/razorpay', express.raw({ type: 'application/json' }), async (req: any, res) => {
+  const secret = process.env.RAZORPAY_WEBHOOK_SECRET || 'scanzo123';
+
+  if (!secret) {
+    console.error('RAZORPAY_WEBHOOK_SECRET is not set. Webhook verification failed.');
+    return res.status(400).json({ error: 'Webhook secret not configured' });
+  }
+  
+  const shasum = crypto.createHmac('sha256', secret);
+  shasum.update(req.body); // req.body is now a buffer
+  const digest = shasum.digest('hex');
+
+  const signature = req.headers['x-razorpay-signature'];
+
+  if (digest === signature) {
+    console.log('Webhook verified');
+    
+    try {
+      const body = JSON.parse(req.body.toString());
+      const event = body.event;
+      const payload = body.payload;
+
+      if (event === 'subscription.activated' || event === 'subscription.charged') {
+        const sub = payload.subscription.entity;
+        const userId = sub.notes?.user_id;
+        const planId = sub.notes?.internal_plan_id;
+
+        if (userId) {
+            console.log(`[Webhook] ${event} for user ${userId}. Plan: ${planId}`);
+            
+            if (!supabase) {
+                console.error('Supabase client not initialized - missing credentials');
+                return res.status(500).json({ error: 'Server configuration error' });
+            }
+
+            const amountPaid = (sub.paid_count || 1) * 250; // Simplified
+            const endDate = new Date(sub.current_end * 1000).toISOString();
+
+            // 1. Insert into 'subscriptions' table
+            const { error: subError } = await supabase
+                .from('subscriptions')
+                .insert({
+                    owner_id: userId,
+                    status: 'active',
+                    current_period_end: endDate,
+                    plan_id: planId || 'premium',
+                    amount_paid: amountPaid,
+                    razorpay_subscription_id: sub.id
+                });
+
+            if (subError) {
+                if (subError.code === '23505') { // unique violation
+                    await supabase
+                        .from('subscriptions')
+                        .update({
+                            current_period_end: endDate,
+                            amount_paid: amountPaid,
+                            status: 'active'
+                        })
+                        .eq('razorpay_subscription_id', sub.id);
+                } else {
+                    console.error('Error inserting into subscriptions table:', subError);
+                }
+            }
+
+            // 2. Update 'businesses' table status
+            const { error: bizError } = await supabase
+                .from('businesses')
+                .update({ 
+                    plan_id: planId || 'premium',
+                    subscription_status: 'active'
+                })
+                .eq('owner_id', userId);
+
+            if (bizError) console.error('Error updating businesses table:', bizError);
+        }
+      } else if (event === 'payment.captured' || event === 'order.paid') {
+        const payment = event === 'payment.captured' ? payload.payment.entity : payload.payment?.entity;
+        if (!payment) return res.json({ status: 'ok' });
+
+        const userId = payment.notes?.user_id;
+        let planId = payment.notes?.plan_name || payment.notes?.plan_id;
+
+        if (userId) {
+            console.log(`[Webhook] ${event} for user ${userId}. Plan: ${planId}`);
+            
+            if (!supabase) {
+                console.error('Supabase client not initialized - missing credentials');
+                return res.status(500).json({ error: 'Server configuration error' });
+            }
+
+            // Infer plan from amount if missing
+            const amount = Number(payment.amount);
+            if (!planId) {
+                if (amount >= 250000) { planId = 'annual'; }
+                else if (amount >= 125000) { planId = 'biannual'; }
+                else { planId = 'monthly'; }
+            }
+
+            const paymentDate = new Date(payment.created_at * 1000);
+            if (planId === 'annual') paymentDate.setFullYear(paymentDate.getFullYear() + 1);
+            else if (planId === 'biannual') paymentDate.setMonth(paymentDate.getMonth() + 6);
+            else paymentDate.setMonth(paymentDate.getMonth() + 1);
+
+            const amountPaid = amount / 100;
+
+            const isExpired = paymentDate < new Date();
+            const newStatus = isExpired ? 'expired' : 'active';
+
+            // 1. Insert into 'subscriptions' table
+            const { error: subError } = await supabase
+                .from('subscriptions')
+                .insert({
+                    owner_id: userId,
+                    status: newStatus,
+                    current_period_end: paymentDate.toISOString(),
+                    plan_id: planId,
+                    amount_paid: amountPaid,
+                    razorpay_subscription_id: `pay_${payment.id}`
+                });
+
+            if (subError) {
+                if (subError.code === '23505') { // unique violation
+                    await supabase
+                        .from('subscriptions')
+                        .update({
+                            current_period_end: paymentDate.toISOString(),
+                            amount_paid: amountPaid,
+                            status: newStatus
+                        })
+                        .eq('razorpay_subscription_id', `pay_${payment.id}`);
+                } else {
+                    console.error('Error inserting into subscriptions table:', subError);
+                }
+            }
+
+            // 2. Update 'businesses' table status
+            const { error: bizError } = await supabase
+                .from('businesses')
+                .update({ 
+                    plan_id: planId || 'premium',
+                    subscription_status: newStatus
+                })
+                .eq('owner_id', userId);
+
+            if (bizError) console.error('Error updating businesses table:', bizError);
+        }
+      } else if (event === 'subscription.cancelled' || event === 'subscription.halted') {
+        const sub = payload.subscription.entity;
+        const userId = sub.notes?.user_id;
+
+        if (userId) {
+            console.log(`[Webhook] ${event} for user ${userId}`);
+            
+            if (supabase) {
+                await supabase
+                    .from('subscriptions')
+                    .update({ status: 'cancelled' })
+                    .eq('razorpay_subscription_id', sub.id);
+
+                await supabase
+                    .from('businesses')
+                    .update({ subscription_status: 'inactive' })
+                    .eq('owner_id', userId);
+            }
+        }
+      }
+    } catch (err) {
+      console.error('Error processing webhook payload:', err);
+    }
+    res.json({ status: 'ok' });
+  } else {
+    console.error('Webhook signature mismatch');
+    res.status(400).json({ error: 'Invalid signature' });
+  }
+});
+
+// JSON parser for all other routes
 app.use(express.json());
 
 // 2. Diagnostics endpoint (Absolute top, no complex logic)
@@ -347,7 +527,6 @@ app.post('/api/create-subscription', async (req, res) => {
       // For other errors, also try fallback
       return returnFallback();
     }
-
   } catch (error: any) {
     console.error('Error creating subscription:', error);
     const errorMessage = error.error?.description || error.message || 'Failed to create subscription';
@@ -355,104 +534,42 @@ app.post('/api/create-subscription', async (req, res) => {
   }
 });
 
-// 2. Webhook Handler
-app.post('/api/webhook/razorpay', async (req: any, res) => {
-  const secret = process.env.RAZORPAY_WEBHOOK_SECRET || 'scanzo123';
+// 1.5 Create Order
+app.post('/api/create-order', async (req, res) => {
+  try {
+    const { amount, planId, userId } = req.body || {};
+    console.log(`[API] Create Order Request - Amount: ${amount}, Plan: ${planId}, User: ${userId}`);
 
-  if (!secret) {
-    console.error('RAZORPAY_WEBHOOK_SECRET is not set. Webhook verification failed.');
-    return res.status(400).json({ error: 'Webhook secret not configured' });
-  }
-  
-  const shasum = crypto.createHmac('sha256', secret);
-  shasum.update(req.body); // req.body is buffer due to bodyParser.raw
-  const digest = shasum.digest('hex');
-
-  const signature = req.headers['x-razorpay-signature'];
-
-  if (digest === signature) {
-    console.log('Webhook verified');
-    
-    try {
-      const body = JSON.parse(req.body.toString());
-      const event = body.event;
-      const payload = body.payload;
-
-      if (event === 'subscription.activated' || event === 'subscription.charged') {
-        const sub = payload.subscription.entity;
-        const userId = sub.notes?.user_id;
-        const planId = sub.notes?.internal_plan_id;
-
-        if (userId) {
-            console.log(`[Webhook] ${event} for user ${userId}. Plan: ${planId}`);
-            
-            if (!supabase) {
-                console.error('Supabase client not initialized - missing credentials');
-                return res.status(500).json({ error: 'Server configuration error' });
-            }
-
-            // 1. Upsert into 'subscriptions' table
-            const endDate = sub.current_end 
-                ? new Date(sub.current_end * 1000).toISOString() 
-                : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(); // Default to 30 days if missing
-            const amountPaid = sub.item?.amount ? sub.item.amount / 100 : 0;
-            
-            const { error: subError } = await supabase
-                .from('subscriptions')
-                .upsert({
-                    owner_id: userId,
-                    status: 'active',
-                    current_period_end: endDate,
-                    plan_id: planId,
-                    amount_paid: amountPaid,
-                    razorpay_subscription_id: sub.id,
-                    updated_at: new Date().toISOString()
-                }, { onConflict: 'razorpay_subscription_id' });
-
-            if (subError) console.error('Error upserting into subscriptions table:', subError);
-
-            // 2. Update 'businesses' table status
-            const { error: bizError } = await supabase
-                .from('businesses')
-                .update({ 
-                    plan_id: planId || 'premium',
-                    subscription_status: 'active'
-                })
-                .eq('owner_id', userId);
-
-            if (bizError) console.error('Error updating businesses table:', bizError);
-        }
-      } else if (event === 'subscription.cancelled' || event === 'subscription.halted') {
-        const sub = payload.subscription.entity;
-        const userId = sub.notes?.user_id;
-
-        if (userId) {
-            console.log(`[Webhook] ${event} for user ${userId}`);
-            
-            if (supabase) {
-                await supabase
-                    .from('businesses')
-                    .update({ subscription_status: 'cancelled' })
-                    .eq('owner_id', userId);
-                
-                await supabase
-                    .from('subscriptions')
-                    .update({ status: 'cancelled' })
-                    .eq('razorpay_subscription_id', sub.id);
-            }
-        }
-      }
-      
-      // Handle other events like subscription.charged, subscription.cancelled etc.
-
-      res.json({ status: 'ok' });
-    } catch (err) {
-      console.error('Error processing webhook payload:', err);
-      res.status(500).json({ error: 'Processing failed' });
+    if (!amount || !userId) {
+      console.warn('[API] Missing amount or userId in request body');
+      return res.status(400).json({ error: 'Missing amount or userId' });
     }
-  } else {
-    console.log('Invalid signature');
-    res.status(400).json({ error: 'Invalid signature' });
+
+    const rzp = getRazorpayInstance();
+    if (!rzp) {
+      console.error('[API] Razorpay instance missing');
+      return res.status(500).json({ error: 'Razorpay configuration missing' });
+    }
+
+    const order = await rzp.orders.create({
+      amount: amount * 100, // Convert to paise
+      currency: "INR",
+      receipt: `rcpt_${Date.now()}`,
+      notes: {
+        user_id: userId,
+        plan_name: planId
+      }
+    });
+
+    res.json({
+      order_id: order.id,
+      key_id: process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID,
+      amount: order.amount,
+      currency: order.currency
+    });
+  } catch (err: any) {
+    console.error('[API] Razorpay Create Order Error:', err);
+    res.status(500).json({ error: err.error?.description || err.message || 'Unknown Error' });
   }
 });
 
@@ -462,6 +579,7 @@ app.post('/api/restore-purchase', async (req, res) => {
   if (!authHeader) return res.status(401).json({ error: 'Missing authorization header' });
 
   const token = authHeader.split(' ')[1];
+  const { paymentId, planId: requestedPlanId } = req.body || {};
   
   // Verify user
   const { data: { user }, error: userError } = await supabase!.auth.getUser(token);
@@ -471,10 +589,10 @@ app.post('/api/restore-purchase', async (req, res) => {
   }
 
   const email = user.email;
-  console.log(`Restoring purchase for ${email} (${user.id})`);
+  console.log(`Restoring purchase for ${email} (${user.id}), paymentId: ${paymentId}`);
 
   let foundValidPayment = false;
-  let planId = 'starter'; // Default fallback
+  let planId = requestedPlanId || 'monthly'; // Default fallback
   let paymentDate = new Date();
   let amountPaid = 250;
   let razorpayId = '';
@@ -487,26 +605,56 @@ app.post('/api/restore-purchase', async (req, res) => {
           return res.status(500).json({ error: 'Razorpay configuration missing' });
       }
 
-      // 1. Check Subscriptions
-      const subscriptions = await rzp.subscriptions.all({ count: 50 });
-      for (const sub of subscriptions.items) {
-          if ((sub.notes && sub.notes.user_id === user.id) || 
-              (sub.notes && sub.notes.email === email)) {
-              
-              if (sub.status === 'active' || sub.status === 'authenticated') {
-                  foundValidPayment = true;
-                  isSubscription = true;
-                  razorpayId = sub.id;
-                  if (sub.plan_id.includes('monthly') || sub.plan_id === PLAN_CONFIG['monthly'].id) planId = 'monthly';
-                  else if (sub.plan_id.includes('annual') || sub.plan_id === PLAN_CONFIG['annual'].id) planId = 'annual';
-                  else if (sub.plan_id.includes('biannual') || sub.plan_id === PLAN_CONFIG['biannual'].id) planId = 'biannual';
-                  else if (sub.plan_id.includes('test') || sub.plan_id === PLAN_CONFIG['test']?.id) planId = 'test';
-                  else planId = 'starter';
-                  
-                  if (sub.current_end) {
-                      paymentDate = new Date(sub.current_end * 1000);
+      // 0. Check specific payment if provided
+      if (paymentId) {
+          try {
+              const pay = await rzp.payments.fetch(paymentId);
+              if (pay && pay.status === 'captured') {
+                  // Verify the payment belongs to this user
+                  if (pay.notes?.user_id === user.id || pay.email === email || pay.contact === email) {
+                      foundValidPayment = true;
+                      isSubscription = false;
+                      razorpayId = pay.id;
+                      const amount = Number(pay.amount);
+                      if (amount >= 250000) { planId = 'annual'; amountPaid = 2500; }
+                      else if (amount >= 125000) { planId = 'biannual'; amountPaid = 1250; }
+                      else { planId = 'monthly'; amountPaid = 250; }
+                      
+                      paymentDate = new Date(pay.created_at * 1000);
+                      if (planId === 'annual') paymentDate.setFullYear(paymentDate.getFullYear() + 1);
+                      else if (planId === 'biannual') paymentDate.setMonth(paymentDate.getMonth() + 6);
+                      else paymentDate.setMonth(paymentDate.getMonth() + 1);
+                  } else {
+                      console.warn(`[Restore] Payment ${paymentId} does not belong to user ${user.id}`);
                   }
-                  break;
+              }
+          } catch (e) {
+              console.error(`[Restore] Failed to fetch specific payment ${paymentId}:`, e);
+          }
+      }
+
+      // 1. Check Subscriptions
+      if (!foundValidPayment) {
+          const subscriptions = await rzp.subscriptions.all({ count: 50 });
+          for (const sub of subscriptions.items) {
+              if ((sub.notes && sub.notes.user_id === user.id) || 
+                  (sub.notes && sub.notes.email === email)) {
+                  
+                  if (sub.status === 'active' || sub.status === 'authenticated') {
+                      foundValidPayment = true;
+                      isSubscription = true;
+                      razorpayId = sub.id;
+                      if (sub.plan_id.includes('monthly') || sub.plan_id === PLAN_CONFIG['monthly'].id) planId = 'monthly';
+                      else if (sub.plan_id.includes('annual') || sub.plan_id === PLAN_CONFIG['annual'].id) planId = 'annual';
+                      else if (sub.plan_id.includes('biannual') || sub.plan_id === PLAN_CONFIG['biannual'].id) planId = 'biannual';
+                      else if (sub.plan_id.includes('test') || sub.plan_id === PLAN_CONFIG['test']?.id) planId = 'test';
+                      else planId = 'monthly';
+                      
+                      if (sub.current_end) {
+                          paymentDate = new Date(sub.current_end * 1000);
+                      }
+                      break;
+                  }
               }
           }
       }
@@ -515,7 +663,7 @@ app.post('/api/restore-purchase', async (req, res) => {
       if (!foundValidPayment) {
           const payments = await rzp.payments.all({ count: 50 });
           for (const pay of payments.items) {
-              if ((pay.email === email || pay.contact === email) && pay.status === 'captured') {
+              if ((pay.notes?.user_id === user.id || pay.email === email || pay.contact === email) && pay.status === 'captured') {
                   foundValidPayment = true;
                   isSubscription = false;
                   razorpayId = pay.id;
@@ -523,7 +671,7 @@ app.post('/api/restore-purchase', async (req, res) => {
                   const amount = Number(pay.amount);
                   if (amount >= 250000) { planId = 'annual'; amountPaid = 2500; }
                   else if (amount >= 125000) { planId = 'biannual'; amountPaid = 1250; }
-                  else { planId = 'starter'; amountPaid = 250; }
+                  else { planId = 'monthly'; amountPaid = 250; }
                   
                   paymentDate = new Date(pay.created_at * 1000);
                   // Add duration
@@ -543,22 +691,35 @@ app.post('/api/restore-purchase', async (req, res) => {
               return res.status(500).json({ error: 'Server configuration error: Supabase client missing' });
           }
 
+          const isExpired = paymentDate < new Date();
+          const newStatus = isExpired ? 'expired' : 'active';
+
           // 1. Insert into subscriptions (using admin client to bypass RLS)
-          // We use insert to ensure we have the latest subscription info
+          // We use insert to ensure we have the latest subscription info and avoid missing unique constraint errors
           const { error: subError } = await supabase
               .from('subscriptions')
               .insert({
                   owner_id: user.id,
-                  status: 'active',
+                  status: newStatus,
                   plan_id: planId,
                   amount_paid: amountPaid,
                   current_period_end: paymentDate.toISOString(),
-                  razorpay_subscription_id: isSubscription ? razorpayId : null,
-                  razorpay_payment_id: !isSubscription ? razorpayId : null
+                  razorpay_subscription_id: isSubscription ? razorpayId : `pay_${razorpayId}`
               });
 
           if (subError) {
-              console.error("Error inserting subscription:", subError);
+              if (subError.code === '23505') { // unique violation
+                  await supabase
+                      .from('subscriptions')
+                      .update({
+                          current_period_end: paymentDate.toISOString(),
+                          amount_paid: amountPaid,
+                          status: newStatus
+                      })
+                      .eq('razorpay_subscription_id', isSubscription ? razorpayId : `pay_${razorpayId}`);
+              } else {
+                  console.error("Error inserting subscription:", subError);
+              }
               // Continue to update business even if subscription log fails, as business status is critical for access
           }
 
@@ -566,7 +727,7 @@ app.post('/api/restore-purchase', async (req, res) => {
           const { error: updateError } = await supabase
               .from('businesses')
               .update({ 
-                  subscription_status: 'active',
+                  subscription_status: newStatus,
                   plan_id: planId 
               })
               .eq('owner_id', user.id);
@@ -574,6 +735,10 @@ app.post('/api/restore-purchase', async (req, res) => {
           if (updateError) {
               console.error("Error updating business:", updateError);
               return res.status(500).json({ error: 'Failed to update business status. Please contact support.' });
+          }
+
+          if (isExpired) {
+              return res.status(400).json({ error: 'Found a payment, but the subscription has already expired.' });
           }
 
           return res.json({ success: true, message: 'Subscription activated successfully' });

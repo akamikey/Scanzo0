@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, Loader2, CreditCard, ShieldCheck, ArrowLeft, Zap, Sparkles, XCircle, AlertCircle } from 'lucide-react';
+import { Check, Loader2, CreditCard, ShieldCheck, ArrowLeft, Zap, Sparkles, XCircle, AlertCircle, RefreshCw } from 'lucide-react';
 import GlassCard from '../components/GlassCard';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -63,26 +63,38 @@ const SubscribePage: React.FC = () => {
     const planId = searchParams.get('plan');
 
     if (paymentId) {
-      handleSuccessFlow(planId);
+      handleSuccessFlow(planId, paymentId);
     } else if (error || (planId && !paymentId && searchParams.has('cancelled'))) {
       handleFailureFlow(planId);
     }
   }, [searchParams]);
 
-  const handleSuccessFlow = async (planId: string | null) => {
+  const handleSuccessFlow = async (planId: string | null, paymentId?: string) => {
     setActivePlanId(planId);
     setPaymentStatus('activating');
+    setErrorDetails(null);
     
+    let isSuccess = false;
+    let errorMessage = 'Payment verification failed. Please contact support if you were charged.';
     try {
       // Attempt to restore/sync purchase immediately
       const token = session?.access_token;
       if (token) {
-        await fetch('/api/restore-purchase', {
+        const res = await fetch('/api/restore-purchase', {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${token}`
-          }
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ paymentId, planId })
         });
+        if (res.ok) {
+          isSuccess = true;
+        } else {
+          const errorData = await res.json().catch(() => ({}));
+          errorMessage = errorData.error || errorMessage;
+          console.error("Failed to sync purchase:", errorData);
+        }
       }
     } catch (e) {
       console.error("Failed to sync purchase", e);
@@ -90,25 +102,31 @@ const SubscribePage: React.FC = () => {
 
     // Step 1 & 2: Dim background and show loader (2 seconds)
     setTimeout(() => {
-      setPaymentStatus('success');
-      
-      // Step 3: Celebration
-      confetti({
-        particleCount: 150,
-        spread: 70,
-        origin: { y: 0.6 },
-        colors: ['#22c55e', '#4ade80', '#ffffff']
-      });
+      if (isSuccess) {
+        setPaymentStatus('success');
+        
+        // Step 3: Celebration
+        confetti({
+          particleCount: 150,
+          spread: 70,
+          origin: { y: 0.6 },
+          colors: ['#22c55e', '#4ade80', '#ffffff']
+        });
 
-      // Refresh data to update subscription status in context
-      refreshData();
+        // Refresh data to update subscription status in context
+        refreshData();
 
-      // Step 6: Return to normal after 5 seconds
-      setTimeout(() => {
-        setPaymentStatus('idle');
-        // Clear search params without refresh
+        // Step 6: Return to normal after 5 seconds
+        setTimeout(() => {
+          setPaymentStatus('idle');
+          // Clear search params without refresh
+          setSearchParams({});
+        }, 5000);
+      } else {
+        setPaymentStatus('cancelled');
+        setErrorDetails({ message: errorMessage });
         setSearchParams({});
-      }, 5000);
+      }
     }, 2500);
   };
 
@@ -140,26 +158,26 @@ const SubscribePage: React.FC = () => {
 
     try {
       const token = session?.access_token;
-      const res = await fetch('https://senkiwubyxeozgvycwjo.supabase.co/functions/v1/create-order', {
+      const res = await fetch('/api/create-order', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           ...(token ? { 'Authorization': `Bearer ${token}` } : {})
         },
-        body: JSON.stringify({ amount: plan.price })
+        body: JSON.stringify({ amount: plan.price, planId: plan.id, userId: user.id })
       });
 
       const data = await res.json();
 
       if (data.order_id) {
         const options = {
-          key: "rzp_live_STxlKmH3jUfhCg",
+          key: data.key_id,
           name: "Scanzo",
           description: "Subscription",
           order_id: data.order_id,
           handler: function (response: any) {
             setProcessingId(null);
-            handleSuccessFlow(plan.id);
+            handleSuccessFlow(plan.id, response.razorpay_payment_id);
           },
           modal: {
             ondismiss: function() {
@@ -218,6 +236,16 @@ const SubscribePage: React.FC = () => {
         </div>
       </div>
 
+      {errorDetails && !activePlanId && (
+        <div className="max-w-2xl mx-auto mb-6 p-4 bg-red-50 dark:bg-red-900/20 rounded-xl border border-red-200 dark:border-red-500/20 flex items-start gap-3">
+          <AlertCircle className="text-red-500 shrink-0 mt-0.5" size={20} />
+          <div>
+            <h3 className="text-sm font-bold text-red-800 dark:text-red-200">Verification Failed</h3>
+            <p className="text-sm text-red-600 dark:text-red-400 mt-1">{errorDetails.message}</p>
+          </div>
+        </div>
+      )}
+
       {subscription?.isActive && paymentStatus === 'idle' ? (
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
@@ -234,9 +262,9 @@ const SubscribePage: React.FC = () => {
                 <ShieldCheck size={40} />
               </div>
               
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Active Subscription</h2>
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Account Verified</h2>
               <p className="text-green-600 dark:text-green-400 font-medium mb-6">
-                You already have an active subscription
+                Your account is verified and premium features are unlocked.
               </p>
               
               <div className="w-full grid grid-cols-2 gap-4 mb-8">
@@ -245,10 +273,15 @@ const SubscribePage: React.FC = () => {
                   <p className="text-lg font-bold text-gray-900 dark:text-white">{subscription.plan || 'Premium'}</p>
                 </div>
                 <div className="bg-white/50 dark:bg-black/20 p-4 rounded-2xl border border-green-100 dark:border-green-500/10">
-                  <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider font-bold mb-1">Expiry Date</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider font-bold mb-1">Valid Until</p>
                   <p className="text-lg font-bold text-gray-900 dark:text-white">
                     {subscription.end_date ? new Date(subscription.end_date).toLocaleDateString() : 'N/A'}
                   </p>
+                  {subscription.end_date && (
+                    <p className="text-xs text-green-600 dark:text-green-400 font-medium mt-1">
+                      {Math.max(0, Math.ceil((new Date(subscription.end_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)))} days remaining
+                    </p>
+                  )}
                 </div>
               </div>
               
@@ -421,6 +454,21 @@ const SubscribePage: React.FC = () => {
             <ShieldCheck size={16} className="text-green-500" />
             Secure 256-bit SSL Encrypted Payment
         </div>
+        
+        {!subscription?.isActive && (
+          <button 
+            onClick={() => handleSuccessFlow(null)}
+            disabled={paymentStatus === 'activating'}
+            className="text-sm text-blue-600 dark:text-blue-400 hover:underline flex items-center justify-center gap-2 mx-auto mt-4"
+          >
+            {paymentStatus === 'activating' ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <RefreshCw size={14} />
+            )}
+            Already paid? Restore Purchase
+          </button>
+        )}
       </div>
 
       {/* Footer */}
