@@ -380,6 +380,10 @@ const PLAN_CONFIG: Record<string, { id: string | undefined, total_count: number 
   'annual': { 
     id: getCleanPlanId(process.env.RAZORPAY_PLAN_ANNUAL, 'plan_SVVV0PIfP8o8Il'),
     total_count: 10 // 10 years
+  },
+  'test': {
+    id: process.env.RAZORPAY_PLAN_TEST,
+    total_count: 1 // Just 1 cycle for test
   }
 };
 
@@ -426,16 +430,8 @@ app.post('/api/create-subscription', async (req, res) => {
                 is_fallback: true
             });
         }
-        
-        const keyId = process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID;
-        if (!keyId) {
-             return res.status(500).json({ 
-                error: `Razorpay keys are missing in your Vercel Environment Variables. Please add RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET.` 
-            });
-        }
-        
         return res.status(500).json({ 
-            error: `Razorpay Error: The plan ID '${razorpayPlanId}' was not found. If this is a test plan, make sure your Vercel RAZORPAY_KEY_ID starts with 'rzp_test_'.` 
+            error: `Server configuration error: Plan ID for '${planId}' is missing and no fallback link available.` 
         });
     };
 
