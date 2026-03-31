@@ -58,6 +58,16 @@ const SubscribePage: React.FC = () => {
   const [errorDetails, setErrorDetails] = useState<{ message: string, details?: string, help?: string } | null>(null);
 
   useEffect(() => {
+    // Dynamically load Razorpay script if not present
+    if (typeof window.Razorpay === 'undefined') {
+      const script = document.createElement('script');
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.async = true;
+      script.onload = () => console.log('Razorpay SDK loaded');
+      script.onerror = () => console.error('Failed to load Razorpay SDK');
+      document.head.appendChild(script);
+    }
+
     const paymentId = searchParams.get('razorpay_payment_id');
     const error = searchParams.get('error');
     const planId = searchParams.get('plan');
@@ -135,13 +145,12 @@ const SubscribePage: React.FC = () => {
     setPaymentStatus('cancelled');
   };
 
-  const openPayment = async (planId: string) => {
+  const openPayment = async (plan: any) => {
     if (!user) {
         alert("Please sign in to subscribe.");
         return;
     }
 
-    const plan = PLANS.find(p => p.planId === planId);
     if (!plan) return;
 
     setProcessingId(plan.id);
@@ -152,7 +161,11 @@ const SubscribePage: React.FC = () => {
     if (typeof window.Razorpay === 'undefined') {
         setProcessingId(null);
         setPaymentStatus('cancelled');
-        setErrorDetails({ message: 'Something went wrong' });
+        setErrorDetails({ 
+          message: 'Razorpay SDK not loaded', 
+          details: 'The payment gateway could not be initialized. This might be due to an ad-blocker or a slow connection.',
+          help: 'Please disable any ad-blockers and refresh the page. If the issue persists, try a different browser.'
+        });
         return;
     }
 
@@ -167,14 +180,25 @@ const SubscribePage: React.FC = () => {
         body: JSON.stringify({ amount: plan.price, planId: plan.id, userId: user.id })
       });
 
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || `Server error: ${res.status}`);
+      }
+
       const data = await res.json();
 
       if (data.order_id) {
         const options = {
           key: data.key_id,
           name: "Scanzo",
-          description: "Subscription",
+          description: `Subscription: ${plan.name}`,
           order_id: data.order_id,
+          prefill: {
+            email: user.email,
+          },
+          theme: {
+            color: "#3B82F6"
+          },
           handler: function (response: any) {
             setProcessingId(null);
             handleSuccessFlow(plan.id, response.razorpay_payment_id);
@@ -192,19 +216,25 @@ const SubscribePage: React.FC = () => {
         rzp.on('payment.failed', function (response: any) {
           setProcessingId(null);
           setPaymentStatus('cancelled');
-          setErrorDetails({ message: 'Payment failed. Please try again' });
+          setErrorDetails({ 
+            message: 'Payment failed', 
+            details: response.error?.description || 'The transaction could not be completed.',
+            help: 'Please check your payment details and try again, or use a different payment method.'
+          });
         });
         rzp.open();
       } else {
-        setProcessingId(null);
-        setPaymentStatus('cancelled');
-        setErrorDetails({ message: 'Something went wrong' });
+        throw new Error('No order ID received from server');
       }
     } catch (error: any) {
       console.error('Payment error:', error);
       setProcessingId(null);
       setPaymentStatus('cancelled');
-      setErrorDetails({ message: 'Something went wrong' });
+      setErrorDetails({ 
+        message: 'Payment Initialization Failed',
+        details: error.message || 'Something went wrong while creating the order.',
+        help: 'Please try again in a few moments. If the problem persists, contact support.'
+      });
     }
   };
 
@@ -412,7 +442,7 @@ const SubscribePage: React.FC = () => {
                             </p>
                           </div>
                           <button
-                              onClick={() => openPayment(plan.planId)}
+                              onClick={() => openPayment(plan)}
                               className="w-full py-4 px-6 rounded-2xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-bold shadow-xl transition-all hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-2"
                           >
                               <CreditCard size={20} />
@@ -426,7 +456,7 @@ const SubscribePage: React.FC = () => {
                         </div>
                       ) : (
                         <button
-                            onClick={() => openPayment(plan.planId)}
+                            onClick={() => openPayment(plan)}
                             disabled={!!processingId}
                             className={`w-full py-4 px-6 rounded-2xl text-white font-bold shadow-xl transition-all transform active:scale-95 bg-gradient-to-r ${plan.color} hover:brightness-110 flex items-center justify-center gap-2 group`}
                         >
