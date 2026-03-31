@@ -8,6 +8,15 @@ import confetti from 'canvas-confetti';
 
 const PLANS = [
   {
+    id: 'test',
+    name: 'Test Plan',
+    price: 10,
+    planId: 'plan_SXwcV2lC1EpYOW',
+    savings: '',
+    color: 'from-green-500 to-emerald-500',
+    popular: false,
+  },
+  {
     id: 'monthly',
     name: 'Monthly Plan',
     price: 250,
