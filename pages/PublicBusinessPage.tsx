@@ -83,9 +83,11 @@ const PublicBusinessPage: React.FC = () => {
                 filter: `owner_id=eq.${page.owner_id}`
               },
               (payload) => {
-                const newStatus = payload.new.status;
-                const endDate = new Date(payload.new.current_period_end);
-                setIsExpired(!(newStatus === 'active' && endDate > new Date()));
+                const sub = payload.new;
+                const endDate = sub.current_period_end ? new Date(sub.current_period_end) : (sub.end_date ? new Date(sub.end_date) : null);
+                const isStatusActive = ['active', 'authenticated', 'completed', 'trialing'].includes(sub.status);
+                const isNotExpired = endDate ? endDate > new Date() : true;
+                setIsExpired(!(isStatusActive && isNotExpired));
               }
             )
             .on(
@@ -97,9 +99,11 @@ const PublicBusinessPage: React.FC = () => {
                 filter: `owner_id=eq.${page.owner_id}`
               },
               (payload) => {
-                const newStatus = payload.new.status;
-                const endDate = new Date(payload.new.current_period_end);
-                setIsExpired(!(newStatus === 'active' && endDate > new Date()));
+                const sub = payload.new;
+                const endDate = sub.current_period_end ? new Date(sub.current_period_end) : (sub.end_date ? new Date(sub.end_date) : null);
+                const isStatusActive = ['active', 'authenticated', 'completed', 'trialing'].includes(sub.status);
+                const isNotExpired = endDate ? endDate > new Date() : true;
+                setIsExpired(!(isStatusActive && isNotExpired));
               }
             )
             .subscribe();
@@ -148,7 +152,7 @@ const PublicBusinessPage: React.FC = () => {
 
       const { data: subData } = await supabase
         .from('subscriptions')
-        .select('status, current_period_end')
+        .select('*')
         .eq('owner_id', pageData.owner_id)
         .order('created_at', { ascending: false })
         .limit(1)
@@ -156,8 +160,10 @@ const PublicBusinessPage: React.FC = () => {
 
       let isSubActive = false;
       if (subData) {
-        const endDate = new Date(subData.current_period_end);
-        if (subData.status === 'active' && endDate > new Date()) {
+        const endDate = subData.current_period_end ? new Date(subData.current_period_end) : (subData.end_date ? new Date(subData.end_date) : null);
+        const isStatusActive = ['active', 'authenticated', 'completed', 'trialing'].includes(subData.status);
+        const isNotExpired = endDate ? endDate > new Date() : true;
+        if (isStatusActive && isNotExpired) {
           isSubActive = true;
         }
       }

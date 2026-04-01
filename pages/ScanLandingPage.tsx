@@ -106,23 +106,25 @@ export default function ScanLandingPage() {
         if (pageData?.logo_url) setLogoUrl(pageData.logo_url);
 
         // 4. Fetch subscription data
-        const subRes = await fetch(`https://senkiwubyxeozgvycwjo.supabase.co/rest/v1/subscriptions?select=*&user_id=eq.${ownerId}&order=created_at.desc&limit=1`, {
-          headers: {
-            'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNlbmtpd3VieXhlb3pndnljd2pvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU5NjQyNTMsImV4cCI6MjA4MTU0MDI1M30.97V4aCtU464P2rT6PQn57uUvDsuTpKbsF_vRW0R-3hQ',
-            'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNlbmtpd3VieXhlb3pndnljd2pvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU5NjQyNTMsImV4cCI6MjA4MTU0MDI1M30.97V4aCtU464P2rT6PQn57uUvDsuTpKbsF_vRW0R-3hQ'
-          }
-        });
+        const { data: subData, error: subError } = await supabase
+          .from('subscriptions')
+          .select('*')
+          .eq('owner_id', ownerId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
         
-        const subData = await subRes.json();
-        
-        if (!subData || subData.length === 0) {
+        if (subError || !subData) {
           setIsExpired(true);
         } else {
-          const sub = subData[0];
-          const endDate = new Date(sub.end_date);
+          const sub = subData;
+          const endDate = sub.current_period_end ? new Date(sub.current_period_end) : (sub.end_date ? new Date(sub.end_date) : null);
           const now = new Date();
           
-          if (now < endDate) {
+          const isStatusActive = ['active', 'authenticated', 'completed', 'trialing'].includes(sub.status);
+          const isNotExpired = endDate ? endDate > now : true;
+          
+          if (isStatusActive && isNotExpired) {
             setIsExpired(false);
           } else {
             setIsExpired(true);
