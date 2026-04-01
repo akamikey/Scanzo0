@@ -537,8 +537,8 @@ app.post('/api/create-subscription', async (req, res) => {
 // 1.5 Create Order
 app.post('/api/create-order', async (req, res) => {
   try {
-    const { amount, planId, razorpayPlanId, userId } = req.body || {};
-    console.log(`[API] Create Order Request - Amount: ${amount}, Plan: ${planId}, RazorpayPlan: ${razorpayPlanId}, User: ${userId}`);
+    const { amount, planId, razorpayPlanId, userId, currency } = req.body || {};
+    console.log(`[API] Create Order Request - Amount: ${amount}, Currency: ${currency}, Plan: ${planId}, RazorpayPlan: ${razorpayPlanId}, User: ${userId}`);
 
     if (!amount || !userId) {
       console.warn('[API] Missing amount or userId in request body');
@@ -553,8 +553,8 @@ app.post('/api/create-order', async (req, res) => {
 
     console.log('[API] Calling rzp.orders.create...');
     const order = await rzp.orders.create({
-      amount: Math.round(amount * 100), // Convert to paise and ensure integer
-      currency: "INR",
+      amount: Math.round(amount * 100), // Convert to paise/cents and ensure integer
+      currency: currency || "INR",
       receipt: `rcpt_${Date.now()}_${userId.substring(0, 8)}`,
       notes: {
         user_id: userId,

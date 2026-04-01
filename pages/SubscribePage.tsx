@@ -1,40 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, Loader2, CreditCard, ShieldCheck, ArrowLeft, Zap, Sparkles, XCircle, AlertCircle, RefreshCw, AlertTriangle } from 'lucide-react';
+import { Check, Loader2, CreditCard, ShieldCheck, ArrowLeft, Zap, Sparkles, XCircle, AlertCircle, RefreshCw, AlertTriangle, Globe } from 'lucide-react';
 import GlassCard from '../components/GlassCard';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { formatPrice, getCurrencyData } from '../lib/currency';
 import confetti from 'canvas-confetti';
-
-const PLANS = [
-  {
-    id: 'monthly',
-    name: 'Monthly Plan',
-    price: 250,
-    planId: 'plan_SVVP7NfadsPhgb',
-    savings: '',
-    color: 'from-blue-500 to-cyan-500',
-    popular: false,
-  },
-  {
-    id: 'biannual',
-    name: '6 Months Plan',
-    price: 1250,
-    planId: 'plan_SVVTUMhJomsRSD',
-    savings: 'Save ₹250',
-    color: 'from-purple-500 to-pink-500',
-    popular: true,
-  },
-  {
-    id: 'annual',
-    name: 'Yearly Plan',
-    price: 2500,
-    planId: 'plan_SVVV0PIfP8o8Il',
-    savings: 'Save ₹500',
-    color: 'from-orange-500 to-red-500',
-    popular: false,
-  },
-];
+import Footer from '../components/Footer';
 
 declare global {
   interface Window {
@@ -43,14 +15,44 @@ declare global {
   var Razorpay: any;
 }
 
-import Footer from '../components/Footer';
-
 const SubscribePage: React.FC = () => {
-  const { user, session, subscription, refreshData } = useAuth();
+  const { user, session, ownerData, subscription, refreshData } = useAuth();
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [fallbackData, setFallbackData] = useState<{ planId: string, url: string } | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+
+  const userCountry = ownerData?.country;
+
+  const PLANS = [
+    {
+      id: 'monthly',
+      name: 'Monthly Plan',
+      price: 250,
+      planId: 'plan_SVVP7NfadsPhgb',
+      savings: '',
+      color: 'from-blue-500 to-cyan-500',
+      popular: false,
+    },
+    {
+      id: 'biannual',
+      name: '6 Months Plan',
+      price: 1250,
+      planId: 'plan_SVVTUMhJomsRSD',
+      savings: `Save ${formatPrice(250, userCountry)}`,
+      color: 'from-purple-500 to-pink-500',
+      popular: true,
+    },
+    {
+      id: 'annual',
+      name: 'Yearly Plan',
+      price: 2500,
+      planId: 'plan_SVVV0PIfP8o8Il',
+      savings: `Save ${formatPrice(500, userCountry)}`,
+      color: 'from-orange-500 to-red-500',
+      popular: false,
+    },
+  ];
 
   // Animation states
   const [paymentStatus, setPaymentStatus] = useState<'idle' | 'activating' | 'success' | 'cancelled'>('idle');
@@ -180,6 +182,8 @@ const SubscribePage: React.FC = () => {
     const plan = PLANS.find(p => p.id === planId || p.planId === planId);
     if (!plan) return;
 
+    const currencyData = getCurrencyData(plan.price, userCountry);
+
     setProcessingId(plan.id);
     setPaymentStatus('idle');
     setErrorDetails(null);
@@ -195,7 +199,7 @@ const SubscribePage: React.FC = () => {
 
     try {
       const token = session?.access_token;
-      console.log(`[Payment] Initiating order for plan: ${plan.id}, price: ${plan.price}`);
+      console.log(`[Payment] Initiating order for plan: ${plan.id}, price: ${currencyData.amount} ${currencyData.currency}`);
       
       const res = await fetch('/api/create-order', {
         method: 'POST',
@@ -204,7 +208,8 @@ const SubscribePage: React.FC = () => {
           ...(token ? { 'Authorization': `Bearer ${token}` } : {})
         },
         body: JSON.stringify({ 
-          amount: plan.price, 
+          amount: currencyData.amount, 
+          currency: currencyData.currency,
           planId: plan.id, 
           razorpayPlanId: plan.planId,
           userId: user.id 
@@ -490,7 +495,7 @@ const SubscribePage: React.FC = () => {
                   <div className="flex-1">
                     <h3 className="text-xl font-bold text-gray-900 dark:text-white">{plan.name}</h3>
                     <div className="mt-4 flex items-baseline">
-                      <span className="text-4xl font-black text-gray-900 dark:text-white">₹{plan.price}</span>
+                      <span className="text-4xl font-black text-gray-900 dark:text-white">{formatPrice(plan.price, userCountry)}</span>
                       <span className="ml-1 text-sm text-gray-500">/period</span>
                     </div>
                     
@@ -560,7 +565,7 @@ const SubscribePage: React.FC = () => {
       <div className="mt-12 text-center space-y-4">
         <div className="flex items-center justify-center gap-2 text-sm text-gray-500 dark:text-gray-400">
             <ShieldCheck size={16} className="text-green-500" />
-            Secure 256-bit SSL Encrypted Payment
+            Secure Payment
         </div>
         
         {!subscription?.isActive && (
