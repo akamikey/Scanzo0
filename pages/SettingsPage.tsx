@@ -197,6 +197,36 @@ const SettingsPage: React.FC = () => {
         </div>
       </GlassCard>
 
+      {/* Account Details Section */}
+      <GlassCard className="p-6">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400">
+            <Shield size={18} />
+          </div>
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white">Account Details</h3>
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-2">
+              Email Address
+            </label>
+            <div className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/10">
+              <Mail size={18} className="text-gray-400" />
+              <span className="text-gray-600 dark:text-gray-300 font-medium">
+                {user?.email || 'No email available'}
+              </span>
+              {user?.email_confirmed_at && (
+                <div className="ml-auto flex items-center gap-1 text-[10px] font-bold text-green-600 dark:text-green-400 uppercase tracking-wider">
+                  <ShieldCheck size={12} />
+                  Verified
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </GlassCard>
+
       {/* Account Actions Grid */}
       <GlassCard className="space-y-0 p-0 overflow-hidden">
          
