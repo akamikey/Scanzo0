@@ -216,13 +216,10 @@ const SettingsPage: React.FC = () => {
               <span className="text-gray-600 dark:text-gray-300 font-medium">
                 {user?.email || 'No email available'}
               </span>
-              {user?.email_confirmed_at && (
-                <div className="ml-auto flex items-center gap-1 text-[10px] font-bold text-green-600 dark:text-green-400 uppercase tracking-wider">
-                  <ShieldCheck size={12} />
-                  Verified
-                </div>
-              )}
             </div>
+            <p className="text-[10px] text-red-500/70 dark:text-red-400/50 mt-2 font-medium">
+              Security Notice: Password recovery is not supported. Please ensure your credentials are saved securely, as account access cannot be restored if the password is lost.
+            </p>
           </div>
         </div>
       </GlassCard>

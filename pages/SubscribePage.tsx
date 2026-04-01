@@ -370,9 +370,9 @@ const SubscribePage: React.FC = () => {
                 <ShieldCheck size={40} />
               </div>
               
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Account Verified</h2>
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Account Activated</h2>
               <p className="text-green-600 dark:text-green-400 font-medium mb-6">
-                Your account is verified and premium features are unlocked.
+                Your account is activated and premium features are unlocked.
               </p>
               
               <div className="w-full grid grid-cols-2 gap-4 mb-8">
