@@ -204,7 +204,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (sub) {
         const now = new Date();
         const endDate = sub.current_period_end ? new Date(sub.current_period_end) : null;
-        const isActive = sub.status === 'active' || sub.status === 'authenticated' || sub.status === 'completed';
+        const isStatusActive = sub.status === 'active' || sub.status === 'authenticated' || sub.status === 'completed';
+        const isNotExpired = endDate ? endDate > now : true;
+        const isActive = isStatusActive && isNotExpired;
 
         let planName = sub.plan_id;
         if (planName === 'plan_SVVP7NfadsPhgb') planName = 'Monthly';
