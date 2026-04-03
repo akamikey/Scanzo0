@@ -9,7 +9,6 @@ interface OwnerData {
   public_slug: string;
   location?: string;
   logo_url?: string;
-  country?: string;
 }
 
 interface SubscriptionData {
@@ -120,14 +119,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // Use businessName from metadata (email signup) or fallback to Google name/email
           const businessName = currentUser.user_metadata?.businessName || currentUser.user_metadata?.full_name || currentUser.email?.split('@')[0] || 'My Business';
           const reviewLink = currentUser.user_metadata?.reviewLink || '';
-          const country = currentUser.user_metadata?.country || 'India';
           const slug = businessName.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + crypto.randomUUID().slice(0, 6);
           
           const { data: newOwner, error: createError } = await supabase.from('owners').insert({
             id: userId,
             business_name: businessName,
             public_slug: slug,
-            country: country
           }).select().single();
 
           if (!createError && newOwner) {
@@ -140,7 +137,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             
             // Clear metadata to prevent re-running this if they delete their owner record
             if (currentUser.user_metadata?.businessName) {
-              await supabase.auth.updateUser({ data: { businessName: null, reviewLink: null, country: null } });
+              await supabase.auth.updateUser({ data: { businessName: null, reviewLink: null } });
             }
           }
         }
@@ -511,32 +508,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signUp = async (email: string, password: string, businessName: string, reviewLink: string) => {
-    // Auto-detect country for the database
-    let detectedCountry = 'India';
-    try {
-      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      if (!timezone.includes('Kolkata') && !timezone.includes('Calcutta')) {
-        const locale = navigator.language;
-        const region = locale.split('-')[1];
-        if (region) {
-          const { COUNTRIES } = await import('../lib/countries');
-          const found = COUNTRIES.find(c => c.code === region);
-          if (found) detectedCountry = found.name;
-          else detectedCountry = 'United States'; // Default international
-        } else {
-          detectedCountry = 'United States'; // Default international
-        }
-      }
-    } catch (e) {}
-
     const { data: authData, error: authError } = await retryAuthCall(() => supabase.auth.signUp({
       email,
       password,
       options: {
         data: {
           businessName,
-          reviewLink,
-          country: detectedCountry
+          reviewLink
         }
       }
     }));
@@ -558,7 +536,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         id: authData.user.id,
         business_name: businessName,
         public_slug: slug,
-        country: detectedCountry
       });
 
       if (dbError) {

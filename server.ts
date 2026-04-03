@@ -537,8 +537,8 @@ app.post('/api/create-subscription', async (req, res) => {
 // 1.5 Create Order
 app.post('/api/create-order', async (req, res) => {
   try {
-    const { amount, planId, razorpayPlanId, userId, currency } = req.body || {};
-    console.log(`[API] Create Order Request - Amount: ${amount}, Currency: ${currency}, Plan: ${planId}, RazorpayPlan: ${razorpayPlanId}, User: ${userId}`);
+    const { amount, planId, razorpayPlanId, userId } = req.body || {};
+    console.log(`[API] Create Order Request - Amount: ${amount}, Plan: ${planId}, RazorpayPlan: ${razorpayPlanId}, User: ${userId}`);
 
     if (!amount || !userId) {
       console.warn('[API] Missing amount or userId in request body');
@@ -553,8 +553,8 @@ app.post('/api/create-order', async (req, res) => {
 
     console.log('[API] Calling rzp.orders.create...');
     const order = await rzp.orders.create({
-      amount: Math.round(amount * 100), // Convert to paise/cents and ensure integer
-      currency: currency || "INR",
+      amount: Math.round(amount * 100), // Convert to paise and ensure integer
+      currency: "INR",
       receipt: `rcpt_${Date.now()}_${userId.substring(0, 8)}`,
       notes: {
         user_id: userId,
@@ -843,16 +843,6 @@ if (distExists && isProduction && !process.env.VERCEL) {
 } else {
   console.log('[Server] Running in Vercel Serverless mode. Static files served by Vercel.');
 }
-
-// Global Error Handler
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-    console.error('[Server] Unhandled Error:', err);
-    if (req.path.startsWith('/api')) {
-        res.status(500).json({ error: 'Internal Server Error', details: err.message });
-    } else {
-        res.status(500).send('<h1>500 Internal Server Error</h1><p>An unexpected error occurred.</p>');
-    }
-});
 
 // Global Fallback for unmatched routes (should be caught by above logic, but just in case)
 app.use((req, res) => {

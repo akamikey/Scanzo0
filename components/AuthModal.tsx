@@ -7,8 +7,6 @@ import { ScanzoLogo } from './ScanzoLogo';
 import { toast } from 'sonner';
 import clsx from 'clsx';
 
-import { COUNTRIES } from '../lib/countries';
-
 interface AuthModalProps {
   isOpen: boolean;
 }

@@ -16,7 +16,7 @@ async function run() {
       notes: {
         user_id: "test_user",
         plan_name: "test_plan",
-        razorpay_plan_id: null
+        razorpay_plan_id: undefined
       }
     });
     console.log(order);
