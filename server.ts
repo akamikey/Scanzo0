@@ -844,6 +844,16 @@ if (distExists && isProduction && !process.env.VERCEL) {
   console.log('[Server] Running in Vercel Serverless mode. Static files served by Vercel.');
 }
 
+// Global Error Handler
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    console.error('[Server] Unhandled Error:', err);
+    if (req.path.startsWith('/api')) {
+        res.status(500).json({ error: 'Internal Server Error', details: err.message });
+    } else {
+        res.status(500).send('<h1>500 Internal Server Error</h1><p>An unexpected error occurred.</p>');
+    }
+});
+
 // Global Fallback for unmatched routes (should be caught by above logic, but just in case)
 app.use((req, res) => {
     res.status(404).send('<h1>404 Not Found</h1><p>The requested URL was not found on this server (Express fallback).</p>');
