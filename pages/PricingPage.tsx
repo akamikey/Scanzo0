@@ -4,11 +4,14 @@ import { useNavigate } from 'react-router-dom';
 import PublicNavbar from '../components/PublicNavbar';
 import { useAuth } from '../context/AuthContext';
 import { ScanzoLogo } from '../components/ScanzoLogo';
+import { formatPrice } from '../lib/currency';
 import PublicFooter from '../components/PublicFooter';
 
 const PricingPage: React.FC = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, ownerData } = useAuth();
+
+  const userCountry = ownerData?.country;
 
   const handleGetStarted = () => {
     if (user) {
@@ -39,7 +42,7 @@ const PricingPage: React.FC = () => {
             >
               <h3 className="text-lg font-bold text-slate-500 mb-2">Monthly</h3>
               <div className="flex items-baseline gap-1 mb-8">
-                <span className="text-4xl font-bold">₹250</span>
+                <span className="text-4xl font-bold">{formatPrice(250, userCountry)}</span>
               </div>
               <button onClick={handleGetStarted} className="mt-auto w-full py-3 rounded-xl border border-slate-200 dark:border-slate-700 font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
                 Get Started
@@ -58,7 +61,7 @@ const PricingPage: React.FC = () => {
               </div>
               <h3 className="text-lg font-bold text-blue-600 mb-2">6 Months</h3>
               <div className="flex items-baseline gap-1 mb-8">
-                <span className="text-4xl font-bold">₹1250</span>
+                <span className="text-4xl font-bold">{formatPrice(1250, userCountry)}</span>
               </div>
               <button onClick={handleGetStarted} className="mt-auto w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-lg shadow-blue-500/20 transition-colors">
                 Get Started
@@ -74,12 +77,12 @@ const PricingPage: React.FC = () => {
             >
               <div className="absolute top-0 right-8 transform -translate-y-1/2">
                 <span className="bg-green-500 text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wide shadow-sm">
-                  Save ₹500
+                  Save {formatPrice(500, userCountry)}
                 </span>
               </div>
               <h3 className="text-lg font-bold text-slate-500 mb-2">Yearly</h3>
               <div className="flex items-baseline gap-1 mb-8">
-                <span className="text-4xl font-bold">₹2500</span>
+                <span className="text-4xl font-bold">{formatPrice(2500, userCountry)}</span>
               </div>
               <button onClick={handleGetStarted} className="mt-auto w-full py-3 rounded-xl border border-slate-200 dark:border-slate-700 font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
                 Get Started

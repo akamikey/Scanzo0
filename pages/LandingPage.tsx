@@ -4,6 +4,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import PublicNavbar from '../components/PublicNavbar';
 import { ScanzoLogo } from '../components/ScanzoLogo';
 import { useAuth } from '../context/AuthContext';
+import { formatPrice } from '../lib/currency';
 import { Star, ArrowRight, CheckCircle2, QrCode, Globe, Layout, MessageSquare, Printer, Building2, Smile, Frown, ShieldAlert, BarChart2 } from 'lucide-react';
 
 import PublicFooter from '../components/PublicFooter';
@@ -15,7 +16,7 @@ interface LandingPageProps {
 
 const LandingPage: React.FC<LandingPageProps> = ({ isDark, toggleTheme }) => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, ownerData } = useAuth();
 
   const handleGetStarted = () => {
     if (user) {
@@ -32,6 +33,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ isDark, toggleTheme }) => {
       navigate('/login');
     }
   };
+
+  const userCountry = ownerData?.country;
 
   return (
     <div className="min-h-screen bg-white dark:bg-slate-950 font-sans text-slate-900 dark:text-white overflow-x-hidden flex flex-col">
@@ -422,9 +425,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ isDark, toggleTheme }) => {
 
         <div className="grid md:grid-cols-3 gap-10 max-w-6xl mx-auto">
           {[
-            { name: 'Monthly', price: '₹250', delay: 0.1, savings: '' },
-            { name: '6 Months', price: '₹1250', popular: true, delay: 0.2, savings: 'Save ₹250' },
-            { name: 'Yearly', price: '₹2500', delay: 0.3, savings: 'Save ₹500' },
+            { name: 'Monthly', price: 250, delay: 0.1, savings: '' },
+            { name: '6 Months', price: 1250, popular: true, delay: 0.2, savings: `Save ${formatPrice(250, userCountry)}` },
+            { name: 'Yearly', price: 2500, delay: 0.3, savings: `Save ${formatPrice(500, userCountry)}` },
           ].map((plan) => (
             <motion.div 
               key={plan.name}
@@ -441,7 +444,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ isDark, toggleTheme }) => {
               )}
               <h3 className={`text-xl font-black mb-4 ${plan.popular ? 'text-blue-600' : 'text-slate-500'}`}>{plan.name}</h3>
               <div className="flex items-baseline gap-2 mb-6">
-                <span className="text-5xl font-black text-slate-900 dark:text-white">{plan.price}</span>
+                <span className="text-5xl font-black text-slate-900 dark:text-white">{formatPrice(plan.price, userCountry)}</span>
                 <span className="text-slate-500 font-medium">/period</span>
               </div>
               
