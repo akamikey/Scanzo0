@@ -9,7 +9,6 @@ import SettingsPage from './pages/SettingsPage';
 import Insights from './pages/Insights';
 import GoogleLinkPage from './pages/GoogleLinkPage';
 import ReviewsPage from './pages/ReviewsPage';
-import DemoPage from './pages/DemoPage';
 import PublicReviewPage from './pages/PublicReviewPage';
 import LandingPage from './pages/LandingPage';
 import AboutPage from './pages/AboutPage';
@@ -58,7 +57,6 @@ const BottomNav = () => {
   const location = useLocation();
   const navItems = [
     { path: '/dashboard', icon: Home, label: 'Home' },
-    { path: '/demo', icon: Play, label: 'Demo' },
     { path: '/reviews', icon: Star, label: 'Reviews' },
     { path: '/insights', icon: BarChart2, label: 'Insights' },
     { path: '/qr-code', icon: QrCode, label: 'QR' },
@@ -128,7 +126,6 @@ const AnimatedRoutes = () => {
         <Route path="/terms" element={<PageWrapper><TermsPage /></PageWrapper>} />
         <Route path="/logo" element={<PageWrapper><LogoPage /></PageWrapper>} />
         <Route path="/login" element={<PageWrapper><LoginWrapper /></PageWrapper>} />
-        <Route path="/demo" element={<PageWrapper><DemoPage /></PageWrapper>} />
         <Route path="/dashboard" element={<PageWrapper><Dashboard /></PageWrapper>} />
         <Route path="/reviews" element={<PageWrapper><ReviewsPage /></PageWrapper>} />
         <Route path="/insights" element={<PageWrapper><Insights /></PageWrapper>} />
@@ -164,7 +161,7 @@ const Layout = () => {
   const isProtectedRoute = protectedRoutes.some(path => location.pathname.startsWith(path));
   
   // Define landing/info pages that are public
-  const isLandingPage = location.pathname === '/' || ['/about', '/how-it-works', '/features', '/pricing', '/privacy', '/terms', '/logo', '/login', '/demo'].includes(location.pathname);
+  const isLandingPage = location.pathname === '/' || ['/about', '/how-it-works', '/features', '/pricing', '/privacy', '/terms', '/logo', '/login'].includes(location.pathname);
   
   // Define direct public access routes (QR scans, reviews, etc)
   const isPublicDirectRoute = location.pathname.startsWith('/scan/') || 

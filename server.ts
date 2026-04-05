@@ -309,10 +309,10 @@ try {
 const getRazorpayInstance = () => {
   try {
     let key_id = (process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID)?.trim();
-    let key_secret = (process.env.RAZORPAY_KEY_SECRET || process.env.RAZORPAY_KEY_SECRETE || process.env.VITE_RAZORPAY_KEY_SECRET)?.trim();
+    let key_secret = (process.env.RAZORPAY_KEY_SECRET || process.env.RAZORPAY_KEY_SECRET || process.env.VITE_RAZORPAY_KEY_SECRET)?.trim();
 
     if (!key_id || !key_secret) {
-      console.warn('[Server] Razorpay keys missing in environment');
+      console.warn('[Server] Razorpay keys missing in environment. Key ID present:', !!key_id);
       return null;
     }
 
@@ -545,6 +545,7 @@ app.post('/api/create-subscription', async (req, res) => {
 
 // 1.5 Create Order
 app.post('/api/create-order', async (req, res) => {
+  console.log('[API] /api/create-order called');
   try {
     const { amount, planId, razorpayPlanId, userId } = req.body || {};
     console.log(`[API] Create Order Request - Amount: ${amount}, Plan: ${planId}, RazorpayPlan: ${razorpayPlanId}, User: ${userId}`);
@@ -560,11 +561,11 @@ app.post('/api/create-order', async (req, res) => {
       return res.status(400).json({ error: 'Razorpay configuration missing on server. Please check environment variables.' });
     }
 
-    console.log('[API] Calling rzp.orders.create...');
+    console.log('[API] Calling rzp.orders.create with amount:', Math.round(amount * 100));
     const order = await rzp.orders.create({
       amount: Math.round(amount * 100), // Convert to paise and ensure integer
       currency: "INR",
-      receipt: `rcpt_${Date.now()}_${userId.substring(0, 8)}`,
+      receipt: `rcpt_${Date.now()}_${String(userId).substring(0, 8)}`,
       notes: {
         user_id: userId,
         plan_name: planId,
@@ -582,8 +583,8 @@ app.post('/api/create-order', async (req, res) => {
     });
   } catch (err: any) {
     console.error('[API] Razorpay Create Order Error:', err);
-    res.status(400).json({ 
-      error: err.error?.description || err.message || 'Unknown Error',
+    res.status(500).json({ 
+      error: err.error?.description || err.message || 'Internal Server Error',
       details: err.message,
       code: err.code
     });

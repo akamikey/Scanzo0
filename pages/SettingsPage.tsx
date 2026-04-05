@@ -111,7 +111,7 @@ const SettingsPage: React.FC = () => {
             <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-2">
               Business Name
             </label>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
               <div className="relative flex-1">
                 <input
                   type="text"
@@ -131,63 +131,61 @@ const SettingsPage: React.FC = () => {
                 />
               </div>
               
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 justify-end">
+                <button
+                  onClick={() => {
+                    setIsEditingName(true);
+                    setHasSavedName(false);
+                  }}
+                  className={clsx(
+                    "p-3 rounded-xl transition-colors",
+                    isEditingName 
+                      ? "bg-blue-100 dark:bg-blue-900/40 text-blue-600" 
+                      : "bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/10"
+                  )}
+                  title="Edit Name"
+                >
+                  <Edit2 size={18} />
+                </button>
+
+                {(isEditingName || hasSavedName) && (
+                  <button
+                    onClick={handleSaveName}
+                    disabled={isSavingName || !businessName.trim() || hasSavedName}
+                    className={clsx(
+                      "px-4 py-3 rounded-xl font-bold flex items-center gap-2 transition-all flex-1 sm:flex-none justify-center",
+                      hasSavedName 
+                        ? "bg-green-500 text-white cursor-default" 
+                        : "bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+                    )}
+                  >
+                    {isSavingName ? (
+                      <Loader2 size={18} className="animate-spin" />
+                    ) : hasSavedName ? (
+                      <>
+                        <Check size={18} />
+                        <span>Saved</span>
+                      </>
+                    ) : (
+                      <>
+                        <Save size={18} />
+                        <span>Save</span>
+                      </>
+                    )}
+                  </button>
+                )}
+
+                {isEditingName && !hasSavedName && (
                   <button
                     onClick={() => {
-                      setIsEditingName(true);
-                      setHasSavedName(false);
+                      setIsEditingName(false);
+                      setBusinessName(ownerData?.business_name || '');
                     }}
-                    className={clsx(
-                      "p-3 rounded-xl transition-colors",
-                      isEditingName 
-                        ? "bg-blue-100 dark:bg-blue-900/40 text-blue-600" 
-                        : "bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/10"
-                    )}
-                    title="Edit Name"
+                    className="p-3 rounded-xl bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/10 transition-colors"
                   >
-                    <Edit2 size={18} />
+                    <X size={18} />
                   </button>
-
-                  {(isEditingName || hasSavedName) && (
-                    <button
-                      onClick={handleSaveName}
-                      disabled={isSavingName || !businessName.trim() || hasSavedName}
-                      className={clsx(
-                        "px-4 py-3 rounded-xl font-bold flex items-center gap-2 transition-all",
-                        hasSavedName 
-                          ? "bg-green-500 text-white cursor-default" 
-                          : "bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
-                      )}
-                    >
-                      {isSavingName ? (
-                        <Loader2 size={18} className="animate-spin" />
-                      ) : hasSavedName ? (
-                        <>
-                          <Check size={18} />
-                          <span>Saved</span>
-                        </>
-                      ) : (
-                        <>
-                          <Save size={18} />
-                          <span>Save</span>
-                        </>
-                      )}
-                    </button>
-                  )}
-
-                  {isEditingName && !hasSavedName && (
-                    <button
-                      onClick={() => {
-                        setIsEditingName(false);
-                        setBusinessName(ownerData?.business_name || '');
-                      }}
-                      className="p-3 rounded-xl bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/10 transition-colors"
-                    >
-                      <X size={18} />
-                    </button>
-                  )}
-                </div>
+                )}
               </div>
             </div>
             <p className="text-[10px] text-gray-400 mt-2">
