@@ -1,13 +1,14 @@
-import React from 'react';
-import { motion } from 'framer-motion';
+import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, Link } from 'react-router-dom';
 import PublicNavbar from '../components/PublicNavbar';
 import { ScanzoLogo } from '../components/ScanzoLogo';
 import { useAuth } from '../context/AuthContext';
 import { formatPrice } from '../lib/currency';
-import { Star, ArrowRight, CheckCircle2, QrCode, Globe, Layout, MessageSquare, Printer, Building2, Smile, Frown, ShieldAlert, BarChart2 } from 'lucide-react';
+import { Star, ArrowRight, CheckCircle2, QrCode, Globe, Layout, MessageSquare, Printer, Building2, Smile, Frown, ShieldAlert, BarChart2, Play, X } from 'lucide-react';
 
 import PublicFooter from '../components/PublicFooter';
+import ShowcaseSection from '../components/ShowcaseSection';
 
 interface LandingPageProps {
   isDark?: boolean;
@@ -69,7 +70,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ isDark, toggleTheme }) => {
               The ultimate QR operating system for physical businesses. Route reviews, showcase menus, and capture leads—all from a single scan.
             </p>
             
-            <div className="flex flex-col items-center gap-6 mb-20">
+            <div className="flex flex-col items-center gap-6 mb-16">
               <ScanzoLogo iconOnly className="scale-150 mb-4" />
               <motion.button 
                 whileHover={{ scale: 1.02, y: -2 }}
@@ -80,6 +81,11 @@ const LandingPage: React.FC<LandingPageProps> = ({ isDark, toggleTheme }) => {
                 start with scanzo
                 <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </motion.button>
+            </div>
+
+            {/* Showcase Section integrated directly here */}
+            <div className="w-full mt-12 mb-20 rounded-[3rem] overflow-hidden shadow-2xl shadow-blue-500/10 border border-slate-200 dark:border-slate-800">
+              <ShowcaseSection />
             </div>
 
             {/* Visual Concept: Modern UI Cards */}

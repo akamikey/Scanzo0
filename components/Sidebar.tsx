@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Home, BarChart2, QrCode, Settings, CreditCard, X, LogOut, Bot, Star, ShieldCheck, Sparkles, Link as LinkIcon } from 'lucide-react';
+import { Home, BarChart2, QrCode, Settings, CreditCard, X, LogOut, Bot, Star, ShieldCheck, Sparkles, Link as LinkIcon, Play } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import clsx from 'clsx';
 import { ScanzoLogo } from './ScanzoLogo';
@@ -12,6 +12,7 @@ interface SidebarProps {
 
 const NAV_ITEMS = [
   { path: '/dashboard', label: 'Dashboard', icon: Home },
+  { path: '/demo', label: 'Demo Video', icon: Play },
   { path: '/reviews', label: 'Reviews', icon: Star },
   { path: '/insights', label: 'Insights', icon: BarChart2 },
   { path: '/google-link', label: 'Google Link', icon: LinkIcon },

@@ -516,16 +516,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
       if (!timezone.includes('Kolkata') && !timezone.includes('Calcutta')) {
-        const locale = navigator.language;
-        const region = locale.split('-')[1];
-        if (region) {
-          const { COUNTRIES } = await import('../lib/countries');
-          const found = COUNTRIES.find(c => c.code === region);
-          if (found) detectedCountry = found.name;
-          else detectedCountry = 'United States'; // Default international
-        } else {
-          detectedCountry = 'United States'; // Default international
-        }
+        detectedCountry = 'United States'; // Default international
       }
     } catch (e) {}
 

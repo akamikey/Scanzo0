@@ -557,7 +557,7 @@ app.post('/api/create-order', async (req, res) => {
     const rzp = getRazorpayInstance();
     if (!rzp) {
       console.error('[API] Razorpay instance missing - check environment variables');
-      return res.status(500).json({ error: 'Razorpay configuration missing on server' });
+      return res.status(400).json({ error: 'Razorpay configuration missing on server. Please check environment variables.' });
     }
 
     console.log('[API] Calling rzp.orders.create...');
@@ -568,7 +568,7 @@ app.post('/api/create-order', async (req, res) => {
       notes: {
         user_id: userId,
         plan_name: planId,
-        razorpay_plan_id: razorpayPlanId
+        ...(razorpayPlanId ? { razorpay_plan_id: razorpayPlanId } : {})
       }
     });
 
@@ -582,7 +582,7 @@ app.post('/api/create-order', async (req, res) => {
     });
   } catch (err: any) {
     console.error('[API] Razorpay Create Order Error:', err);
-    res.status(500).json({ 
+    res.status(400).json({ 
       error: err.error?.description || err.message || 'Unknown Error',
       details: err.message,
       code: err.code
@@ -619,7 +619,7 @@ app.post('/api/restore-purchase', async (req, res) => {
       const rzp = getRazorpayInstance();
       if (!rzp) {
           console.error('[Restore] Razorpay instance missing - cannot fetch subscriptions');
-          return res.status(500).json({ error: 'Razorpay configuration missing' });
+          return res.status(400).json({ error: 'Razorpay configuration missing on server. Please check environment variables.' });
       }
 
       // 0. Check specific payment if provided
