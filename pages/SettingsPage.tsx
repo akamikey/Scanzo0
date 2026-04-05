@@ -64,7 +64,10 @@ const SettingsPage: React.FC = () => {
       // Reset "Saved" status after 3 seconds
       setTimeout(() => setHasSavedName(false), 3000);
     } catch (err) {
-      console.error("Error saving business name:", err);
+      const handled = await handleAuthError(err);
+      if (!handled) {
+        console.error("Error saving business name:", err);
+      }
     } finally {
       setIsSavingName(false);
     }

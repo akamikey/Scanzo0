@@ -54,7 +54,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSubscription(null);
       
       // 2. Clear Supabase session
-      await supabase.auth.signOut();
+      // We use a timeout to prevent signOut from hanging if the refresh token is invalid
+      const signOutPromise = supabase.auth.signOut();
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error("SignOut Timeout")), 2000)
+      );
+      
+      await Promise.race([signOutPromise, timeoutPromise]).catch(e => {
+        console.warn("Sign out failed or timed out during session clearing:", e);
+      });
     } catch (e) {
       console.warn("Sign out failed during session clearing:", e);
     } finally {
@@ -64,20 +72,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const keysToRemove = [];
         for (let i = 0; i < localStorage.length; i++) {
           const key = localStorage.key(i);
-          if (key && (key.startsWith('sb-') || key.includes('auth-token'))) {
+          if (key && (key.startsWith('sb-') || key.includes('auth-token') || key.includes('supabase.auth.token'))) {
             keysToRemove.push(key);
           }
         }
         keysToRemove.forEach(key => localStorage.removeItem(key));
+        
+        // Also clear cached data
+        localStorage.removeItem('cached_owner_data');
+        localStorage.removeItem('cached_subscription');
       } catch (e) {
         console.error("Error manually clearing localStorage:", e);
+      }
+      
+      // 4. Redirect to login with reason
+      // Only redirect if we're not already on a public page or login page
+      if (window.location.pathname !== '/login' && 
+          !window.location.pathname.startsWith('/r/') && 
+          !window.location.pathname.startsWith('/b/') && 
+          window.location.pathname !== '/') {
+        window.location.href = '/login?reason=session_expired';
       }
     }
   };
 
   const handleAuthError = async (error: any) => {
-    const msg = error?.message || String(error);
-    if (msg.includes("Refresh Token Not Found") || msg.includes("Invalid Refresh Token") || msg.includes("refresh_token_not_found")) {
+    if (!error) return false;
+    
+    // Check various error properties for refresh token issues
+    const msg = error?.message || error?.error_description || error?.error || String(error);
+    const isRefreshTokenError = 
+      msg.includes("Refresh Token Not Found") || 
+      msg.includes("Invalid Refresh Token") || 
+      msg.includes("refresh_token_not_found") ||
+      msg.includes("refresh_token_invalid") ||
+      msg.includes("Invalid token: token is expired");
+
+    if (isRefreshTokenError) {
       console.warn("Stale refresh token detected, clearing session");
       await clearAuthSession();
       return true;
@@ -115,7 +146,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // Handle delayed owner creation (e.g., after email verification or Google OAuth)
       if (!finalOwnerData) {
-        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        const { data: userData, error: userError } = await retryAuthCall(() => supabase.auth.getUser());
+        const currentUser = userData?.user;
+        
+        if (userError) {
+            await handleAuthError(userError);
+            return;
+        }
+
         if (currentUser && currentUser.id === userId) {
           // Use businessName from metadata (email signup) or fallback to Google name/email
           const businessName = currentUser.user_metadata?.businessName || currentUser.user_metadata?.full_name || currentUser.email?.split('@')[0] || 'My Business';
@@ -327,7 +365,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const msg = result.error?.message || JSON.stringify(result.error) || '';
         
         // Check for refresh token errors - clear session immediately
-        if (msg.includes("Refresh Token Not Found") || msg.includes("Invalid Refresh Token") || msg.includes("refresh_token_not_found")) {
+        if (msg.includes("Refresh Token Not Found") || 
+            msg.includes("Invalid Refresh Token") || 
+            msg.includes("refresh_token_not_found") ||
+            msg.includes("refresh_token_invalid") ||
+            msg.includes("Invalid token: token is expired")) {
           console.warn("Stale refresh token detected in auth call, clearing session");
           await clearAuthSession();
           return result;
@@ -406,8 +448,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const session = result.data?.session;
             
             if (error) {
-                const msg = error.message || String(error);
-                if (msg.includes("Refresh Token Not Found") || msg.includes("Invalid Refresh Token") || msg.includes("refresh_token_not_found")) {
+                const msg = error.message || error.error_description || String(error);
+                if (msg.includes("Refresh Token Not Found") || 
+                    msg.includes("Invalid Refresh Token") || 
+                    msg.includes("refresh_token_not_found") ||
+                    msg.includes("refresh_token_invalid") ||
+                    msg.includes("Invalid token: token is expired")) {
                     console.warn("Stale refresh token detected, clearing session");
                     await clearAuthSession();
                     return;
@@ -430,11 +476,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
         } catch (error: any) {
             if (mounted) {
-                const msg = error?.message || String(error);
+                const msg = error?.message || error?.error_description || String(error);
                 // If onAuthStateChange already gave us a user (authResolved is true), don't treat this as a fatal error
                 if (authResolved) {
                     console.warn("getSession failed but auth was already resolved:", error);
-                } else if (msg.includes("Refresh Token Not Found") || msg.includes("Invalid Refresh Token") || msg.includes("refresh_token_not_found")) {
+                } else if (msg.includes("Refresh Token Not Found") || 
+                           msg.includes("Invalid Refresh Token") || 
+                           msg.includes("refresh_token_not_found") ||
+                           msg.includes("refresh_token_invalid") ||
+                           msg.includes("Invalid token: token is expired")) {
                     console.warn("Stale session detected during initialization:", msg);
                     await clearAuthSession();
                 } else if (msg.includes("Lock broken") || msg.includes("lock")) {
@@ -469,8 +519,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (mounted) {
           authResolved = true;
-          if ((event as string) === 'TOKEN_REFRESH_REVOKED') {
-             console.warn("Token revoked");
+          
+          if ((event as string) === 'TOKEN_REFRESH_REVOKED' || event === 'SIGNED_OUT') {
+             console.warn(`Auth event: ${event}, clearing session`);
              await clearAuthSession();
              setLoading(false);
              return;

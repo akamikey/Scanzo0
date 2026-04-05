@@ -17,7 +17,7 @@ import clsx from 'clsx';
 
 export default function BusinessBuilder() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, handleAuthError } = useAuth();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -77,7 +77,10 @@ export default function BusinessBuilder() {
       }
 
     } catch (err: any) {
-      console.error('Error fetching data:', err);
+      const handled = await handleAuthError(err);
+      if (!handled) {
+        console.error('Error fetching data:', err);
+      }
     } finally {
       setLoading(false);
     }
@@ -114,7 +117,10 @@ export default function BusinessBuilder() {
 
       setBusinessPage(prev => ({ ...prev, [field]: publicUrl }));
     } catch (err: any) {
-      setError(err.message);
+      const handled = await handleAuthError(err);
+      if (!handled) {
+        setError(err.message);
+      }
     }
   };
 
@@ -138,7 +144,10 @@ export default function BusinessBuilder() {
 
       setGallery(prev => [...prev, { image_url: publicUrl }]);
     } catch (err: any) {
-      setError(err.message);
+      const handled = await handleAuthError(err);
+      if (!handled) {
+        setError(err.message);
+      }
     }
   };
 
@@ -223,8 +232,11 @@ export default function BusinessBuilder() {
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
     } catch (err: any) {
-      console.error('Save error:', err);
-      setError(err.message || 'Failed to save business page');
+      const handled = await handleAuthError(err);
+      if (!handled) {
+        console.error('Save error:', err);
+        setError(err.message || 'Failed to save business page');
+      }
     } finally {
       setSaving(false);
     }

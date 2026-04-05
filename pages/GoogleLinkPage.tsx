@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Footer from '../components/Footer';
 
 const GoogleLinkPage: React.FC = () => {
-  const { user } = useAuth();
+  const { user, handleAuthError } = useAuth();
   
   // Review Link State
   const [reviewLink, setReviewLink] = useState('');
@@ -48,7 +48,10 @@ const GoogleLinkPage: React.FC = () => {
         }
       }
     } catch (e) {
-      console.error("Fetch error:", e);
+      const handled = await handleAuthError(e);
+      if (!handled) {
+        console.error("Fetch error:", e);
+      }
     }
   };
 
@@ -113,8 +116,11 @@ const GoogleLinkPage: React.FC = () => {
       setIsEditingReview(false);
       setTimeout(() => setSuccessReview(false), 3000);
     } catch (err: any) {
-      console.error("Save error:", err);
-      setErrorReview(err.message || 'Failed to save review link');
+      const handled = await handleAuthError(err);
+      if (!handled) {
+        console.error("Save error:", err);
+        setErrorReview(err.message || 'Failed to save review link');
+      }
     } finally {
       setLoadingReview(false);
     }
@@ -163,8 +169,11 @@ const GoogleLinkPage: React.FC = () => {
       setIsEditingWebsite(false);
       setTimeout(() => setSuccessWebsite(false), 3000);
     } catch (err: any) {
-      console.error("Save error:", err);
-      setErrorWebsite(err.message || 'Failed to save website link');
+      const handled = await handleAuthError(err);
+      if (!handled) {
+        console.error("Save error:", err);
+        setErrorWebsite(err.message || 'Failed to save website link');
+      }
     } finally {
       setLoadingWebsite(false);
     }

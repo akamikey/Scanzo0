@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Mail, Lock, Building, Link as LinkIcon, ArrowRight, Loader2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { ScanzoLogo } from './ScanzoLogo';
 import { toast } from 'sonner';
 import clsx from 'clsx';
@@ -21,6 +21,8 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen }) => {
   const [verificationSent, setVerificationSent] = useState(false);
   const { signIn, signUp } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const sessionExpired = searchParams.get('reason') === 'session_expired';
 
   // Form States
   const [email, setEmail] = useState('');
@@ -98,6 +100,12 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen }) => {
               {isLogin ? 'Enter your credentials to access your dashboard.' : 'Start collecting reviews in minutes.'}
             </p>
           </div>
+
+          {sessionExpired && !error && (
+            <div className="mb-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 text-sm text-center font-medium">
+              Your session has expired. Please log in again.
+            </div>
+          )}
 
           {error && (
             <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-sm text-center">
