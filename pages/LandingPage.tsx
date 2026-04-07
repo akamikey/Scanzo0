@@ -1,14 +1,13 @@
-import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React from 'react';
+import { motion } from 'framer-motion';
 import { useNavigate, Link } from 'react-router-dom';
 import PublicNavbar from '../components/PublicNavbar';
 import { ScanzoLogo } from '../components/ScanzoLogo';
 import { useAuth } from '../context/AuthContext';
-import { formatPrice } from '../lib/currency';
-import { Star, ArrowRight, CheckCircle2, QrCode, Globe, Layout, MessageSquare, Printer, Building2, Smile, Frown, ShieldAlert, BarChart2, Play, X } from 'lucide-react';
+import { Star, ArrowRight, CheckCircle2, QrCode, Globe, Layout, MessageSquare, Printer, Building2, Smile, Frown, ShieldAlert, BarChart2 } from 'lucide-react';
 
 import PublicFooter from '../components/PublicFooter';
-import ShowcaseSection from '../components/ShowcaseSection';
+import { ShowcaseSection } from '../components/ShowcaseSection';
 
 interface LandingPageProps {
   isDark?: boolean;
@@ -17,7 +16,7 @@ interface LandingPageProps {
 
 const LandingPage: React.FC<LandingPageProps> = ({ isDark, toggleTheme }) => {
   const navigate = useNavigate();
-  const { user, ownerData } = useAuth();
+  const { user } = useAuth();
 
   const handleGetStarted = () => {
     if (user) {
@@ -34,8 +33,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ isDark, toggleTheme }) => {
       navigate('/login');
     }
   };
-
-  const userCountry = ownerData?.country;
 
   return (
     <div className="min-h-screen bg-white dark:bg-slate-950 font-sans text-slate-900 dark:text-white overflow-x-hidden flex flex-col">
@@ -70,7 +67,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ isDark, toggleTheme }) => {
               The ultimate QR operating system for physical businesses. Route reviews, showcase menus, and capture leads—all from a single scan.
             </p>
             
-            <div className="flex flex-col items-center gap-6 mb-16">
+            <div className="flex flex-col items-center gap-6 mb-20">
               <ScanzoLogo iconOnly className="scale-150 mb-4" />
               <motion.button 
                 whileHover={{ scale: 1.02, y: -2 }}
@@ -83,8 +80,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ isDark, toggleTheme }) => {
               </motion.button>
             </div>
 
-            {/* Showcase Section integrated directly here */}
-            <div className="w-full mt-12 mb-20 rounded-[3rem] overflow-hidden shadow-2xl shadow-blue-500/10 border border-slate-200 dark:border-slate-800">
+            <div className="w-full max-w-4xl mx-auto mb-12">
               <ShowcaseSection />
             </div>
 
@@ -431,9 +427,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ isDark, toggleTheme }) => {
 
         <div className="grid md:grid-cols-3 gap-10 max-w-6xl mx-auto">
           {[
-            { name: 'Monthly', price: 250, delay: 0.1, savings: '' },
-            { name: '6 Months', price: 1250, popular: true, delay: 0.2, savings: `Save ${formatPrice(250, userCountry)}` },
-            { name: 'Yearly', price: 2500, delay: 0.3, savings: `Save ${formatPrice(500, userCountry)}` },
+            { name: 'Monthly', price: '₹250', delay: 0.1, savings: '' },
+            { name: '6 Months', price: '₹1250', popular: true, delay: 0.2, savings: 'Save ₹250' },
+            { name: 'Yearly', price: '₹2500', delay: 0.3, savings: 'Save ₹500' },
           ].map((plan) => (
             <motion.div 
               key={plan.name}
@@ -450,7 +446,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ isDark, toggleTheme }) => {
               )}
               <h3 className={`text-xl font-black mb-4 ${plan.popular ? 'text-blue-600' : 'text-slate-500'}`}>{plan.name}</h3>
               <div className="flex items-baseline gap-2 mb-6">
-                <span className="text-5xl font-black text-slate-900 dark:text-white">{formatPrice(plan.price, userCountry)}</span>
+                <span className="text-5xl font-black text-slate-900 dark:text-white">{plan.price}</span>
                 <span className="text-slate-500 font-medium">/period</span>
               </div>
               

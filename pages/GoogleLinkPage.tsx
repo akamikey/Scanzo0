@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Footer from '../components/Footer';
 
 const GoogleLinkPage: React.FC = () => {
-  const { user, handleAuthError } = useAuth();
+  const { user } = useAuth();
   
   // Review Link State
   const [reviewLink, setReviewLink] = useState('');
@@ -23,6 +23,14 @@ const GoogleLinkPage: React.FC = () => {
   const [errorWebsite, setErrorWebsite] = useState('');
   const [successWebsite, setSuccessWebsite] = useState(false);
 
+  // Custom Link 1 State
+  const [customLink1, setCustomLink1] = useState('');
+  const [customLinkLabel1, setCustomLinkLabel1] = useState('');
+  const [isEditingCustom1, setIsEditingCustom1] = useState(true);
+  const [loadingCustom1, setLoadingCustom1] = useState(false);
+  const [errorCustom1, setErrorCustom1] = useState('');
+  const [successCustom1, setSuccessCustom1] = useState(false);
+
   useEffect(() => {
     if (user) {
       fetchLinks();
@@ -33,7 +41,7 @@ const GoogleLinkPage: React.FC = () => {
     try {
       const { data, error } = await supabase
         .from('businesses')
-        .select('review_link, website_link')
+        .select('review_link, website_link, custom_link_1, custom_link_label_1')
         .eq('owner_id', user?.id)
         .maybeSingle();
         
@@ -46,12 +54,16 @@ const GoogleLinkPage: React.FC = () => {
           setWebsiteLink(data.website_link);
           setIsEditingWebsite(false);
         }
+        if (data.custom_link_1) {
+          setCustomLink1(data.custom_link_1);
+          setIsEditingCustom1(false);
+        }
+        if (data.custom_link_label_1) {
+          setCustomLinkLabel1(data.custom_link_label_1);
+        }
       }
     } catch (e) {
-      const handled = await handleAuthError(e);
-      if (!handled) {
-        console.error("Fetch error:", e);
-      }
+      console.error("Fetch error:", e);
     }
   };
 
@@ -116,11 +128,8 @@ const GoogleLinkPage: React.FC = () => {
       setIsEditingReview(false);
       setTimeout(() => setSuccessReview(false), 3000);
     } catch (err: any) {
-      const handled = await handleAuthError(err);
-      if (!handled) {
-        console.error("Save error:", err);
-        setErrorReview(err.message || 'Failed to save review link');
-      }
+      console.error("Save error:", err);
+      setErrorReview(err.message || 'Failed to save review link');
     } finally {
       setLoadingReview(false);
     }
@@ -159,7 +168,13 @@ const GoogleLinkPage: React.FC = () => {
       } else {
         const { error } = await supabase
           .from('businesses')
-          .insert({ owner_id: user.id, review_link: reviewLink, website_link: websiteLink });
+          .insert({ 
+            owner_id: user.id, 
+            review_link: reviewLink, 
+            website_link: websiteLink, 
+            custom_link_1: customLink1,
+            custom_link_label_1: customLinkLabel1
+          });
         saveError = error;
       }
 
@@ -169,13 +184,68 @@ const GoogleLinkPage: React.FC = () => {
       setIsEditingWebsite(false);
       setTimeout(() => setSuccessWebsite(false), 3000);
     } catch (err: any) {
-      const handled = await handleAuthError(err);
-      if (!handled) {
-        console.error("Save error:", err);
-        setErrorWebsite(err.message || 'Failed to save website link');
-      }
+      console.error("Save error:", err);
+      setErrorWebsite(err.message || 'Failed to save website link');
     } finally {
       setLoadingWebsite(false);
+    }
+  };
+
+  const handleSaveCustom1 = async () => {
+    if (!user) return;
+
+    if (customLink1 && !/^https?:\/\//i.test(customLink1)) {
+      setErrorCustom1('Link must start with http:// or https://');
+      return;
+    }
+
+    setLoadingCustom1(true);
+    setErrorCustom1('');
+    setSuccessCustom1(false);
+
+    try {
+      const ownerExists = await ensureOwnerExists();
+      if (!ownerExists) throw new Error("Could not verify business owner profile.");
+
+      const { data: existing } = await supabase
+        .from('businesses')
+        .select('id')
+        .eq('owner_id', user.id)
+        .maybeSingle();
+
+      let saveError;
+      if (existing) {
+        const { error } = await supabase
+          .from('businesses')
+          .update({ 
+            custom_link_1: customLink1,
+            custom_link_label_1: customLinkLabel1
+          })
+          .eq('owner_id', user.id);
+        saveError = error;
+      } else {
+        const { error } = await supabase
+          .from('businesses')
+          .insert({ 
+            owner_id: user.id, 
+            review_link: reviewLink, 
+            website_link: websiteLink, 
+            custom_link_1: customLink1,
+            custom_link_label_1: customLinkLabel1
+          });
+        saveError = error;
+      }
+
+      if (saveError) throw saveError;
+
+      setSuccessCustom1(true);
+      setIsEditingCustom1(false);
+      setTimeout(() => setSuccessCustom1(false), 3000);
+    } catch (err: any) {
+      console.error("Save error:", err);
+      setErrorCustom1(err.message || 'Failed to save link');
+    } finally {
+      setLoadingCustom1(false);
     }
   };
 
@@ -298,6 +368,82 @@ const GoogleLinkPage: React.FC = () => {
             className="w-full sm:w-auto px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-lg shadow-blue-500/20 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-70"
           >
             {loadingWebsite ? <Loader2 className="animate-spin" size={20} /> : <><Save size={20} /> Save Website Link</>}
+          </button>
+        )}
+      </div>
+
+      {/* Custom Link Card */}
+      <div className="bg-white dark:bg-gray-800 p-6 sm:p-8 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 space-y-6 relative overflow-hidden">
+        <div className="flex justify-between items-start">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white">Custom Link</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Add an extra link for your customers.</p>
+          </div>
+          {!isEditingCustom1 && (
+            <button 
+              onClick={() => setIsEditingCustom1(true)}
+              className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 rounded-xl transition-colors flex items-center gap-2 text-sm font-bold"
+            >
+              <Edit2 size={16} />
+              <span className="hidden sm:inline">Edit</span>
+            </button>
+          )}
+        </div>
+
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <label className="text-sm font-bold text-gray-700 dark:text-gray-300 ml-1">Link Label</label>
+            <input 
+              type="text" 
+              value={customLinkLabel1} 
+              onChange={e => setCustomLinkLabel1(e.target.value)} 
+              disabled={!isEditingCustom1}
+              placeholder="e.g. Follow us on Instagram"
+              className={`w-full p-4 border rounded-2xl bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white outline-none transition-all ${
+                !isEditingCustom1 
+                  ? 'border-transparent opacity-70 cursor-default' 
+                  : 'border-gray-200 dark:border-gray-700 focus:ring-2 focus:ring-blue-500'
+              }`}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-bold text-gray-700 dark:text-gray-300 ml-1">Destination URL</label>
+            <input 
+              type="text" 
+              value={customLink1} 
+              onChange={e => setCustomLink1(e.target.value)} 
+              disabled={!isEditingCustom1}
+              placeholder="https://example.com"
+              className={`w-full p-4 border rounded-2xl bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white outline-none transition-all ${
+                !isEditingCustom1 
+                  ? 'border-transparent opacity-70 cursor-default' 
+                  : 'border-gray-200 dark:border-gray-700 focus:ring-2 focus:ring-blue-500'
+              }`}
+            />
+          </div>
+        </div>
+
+        <AnimatePresence mode="wait">
+          {errorCustom1 && (
+            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="text-red-500 text-sm flex items-center gap-2">
+              <AlertCircle size={16} /> {errorCustom1}
+            </motion.div>
+          )}
+          {successCustom1 && (
+            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="text-green-600 text-sm flex items-center gap-2 font-medium">
+              <CheckCircle2 size={16} /> Link saved successfully!
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {isEditingCustom1 && (
+          <button 
+            onClick={handleSaveCustom1}
+            disabled={loadingCustom1}
+            className="w-full sm:w-auto px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-lg shadow-blue-500/20 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-70"
+          >
+            {loadingCustom1 ? <Loader2 className="animate-spin" size={20} /> : <><Save size={20} /> Save Custom Link</>}
           </button>
         )}
       </div>

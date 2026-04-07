@@ -139,14 +139,16 @@ const PublicBusinessPage: React.FC = () => {
       // 2. Check Subscription
       const { data: bizData } = await supabase
         .from('businesses')
-        .select('review_link, website_link')
+        .select('review_link, website_link, custom_link_1, custom_link_label_1')
         .eq('owner_id', pageData.owner_id)
         .maybeSingle();
 
       if (bizData) {
         setLinks({
           website_link: bizData.website_link,
-          google_link: bizData.review_link
+          google_link: bizData.review_link,
+          custom_link_1: bizData.custom_link_1,
+          custom_link_label_1: bizData.custom_link_label_1
         });
       }
 
@@ -382,6 +384,22 @@ const PublicBusinessPage: React.FC = () => {
               >
                 <Globe size={24} />
                 <span className="text-sm">{isExpired ? 'Website Locked' : 'Website'}</span>
+              </a>
+            )}
+            {links?.custom_link_1 && (
+              <a 
+                href={!isExpired ? links.custom_link_1 : undefined}
+                target={!isExpired ? "_blank" : undefined}
+                rel={!isExpired ? "noopener noreferrer" : undefined}
+                onClick={(e) => isExpired && e.preventDefault()}
+                className={`flex flex-col items-center justify-center gap-2 py-4 rounded-2xl font-bold shadow-lg transition-all ${
+                  isExpired 
+                    ? 'bg-gray-200 dark:bg-white/5 text-gray-400 cursor-not-allowed grayscale' 
+                    : 'bg-indigo-500 text-white hover:bg-indigo-600 active:scale-95'
+                }`}
+              >
+                <ExternalLink size={24} />
+                <span className="text-sm">{isExpired ? 'Link Locked' : (links.custom_link_label_1 || 'Custom Link')}</span>
               </a>
             )}
             {page.address && (

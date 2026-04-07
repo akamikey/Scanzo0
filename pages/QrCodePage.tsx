@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import Footer from '../components/Footer';
 
-const PosterPreviewModal: React.FC<{ isOpen: boolean, onClose: () => void, businessName: string, qrUrl: string, logoUrl?: string | null }> = ({ isOpen, onClose, businessName, qrUrl, logoUrl }) => {
+const PosterPreviewModal: React.FC<{ isOpen: boolean, onClose: () => void, businessName: string, qrUrl: string, logoUrl?: string | null, customLinkLabel?: string | null }> = ({ isOpen, onClose, businessName, qrUrl, logoUrl, customLinkLabel }) => {
   if (!isOpen) return null;
 
   return (
@@ -64,6 +64,12 @@ const PosterPreviewModal: React.FC<{ isOpen: boolean, onClose: () => void, busin
                 <div className="w-1.5 h-1.5 rounded-full bg-white/50" />
                 <span>View Menu / Website</span>
               </div>
+              {customLinkLabel && (
+                <div className="flex items-center gap-4 text-slate-200 font-medium justify-center text-lg">
+                  <div className="w-1.5 h-1.5 rounded-full bg-white/50" />
+                  <span>{customLinkLabel}</span>
+                </div>
+              )}
               <div className="flex items-center gap-4 text-slate-200 font-medium justify-center text-lg">
                 <div className="w-1.5 h-1.5 rounded-full bg-white/50" />
                 <span>Leave Feedback</span>
@@ -289,6 +295,7 @@ const QrCodePage: React.FC = () => {
 
             <div class="features-list">
               <div class="feature-item"><div class="dot"></div> View Menu / Website</div>
+              ${ownerData?.custom_link_label_1 ? `<div class="feature-item"><div class="dot"></div> ${ownerData.custom_link_label_1}</div>` : ''}
               <div class="feature-item"><div class="dot"></div> Leave Feedback</div>
               <div class="feature-item"><div class="dot"></div> Connect With Us</div>
             </div>
@@ -315,6 +322,7 @@ const QrCodePage: React.FC = () => {
         businessName={businessName} 
         qrUrl={qrApiUrl} 
         logoUrl={ownerData?.logo_url}
+        customLinkLabel={ownerData?.custom_link_label_1}
       />
 
       <div className="flex items-center gap-4">

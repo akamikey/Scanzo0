@@ -6,10 +6,11 @@ interface OwnerData {
   business_id?: string;
   business_name: string;
   review_link: string;
+  custom_link_1?: string;
+  custom_link_label_1?: string;
   public_slug: string;
   location?: string;
   logo_url?: string;
-  country?: string;
 }
 
 interface SubscriptionData {
@@ -54,15 +55,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSubscription(null);
       
       // 2. Clear Supabase session
-      // We use a timeout to prevent signOut from hanging if the refresh token is invalid
-      const signOutPromise = supabase.auth.signOut();
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error("SignOut Timeout")), 2000)
-      );
-      
-      await Promise.race([signOutPromise, timeoutPromise]).catch(e => {
-        console.warn("Sign out failed or timed out during session clearing:", e);
-      });
+      await supabase.auth.signOut();
     } catch (e) {
       console.warn("Sign out failed during session clearing:", e);
     } finally {
@@ -72,43 +65,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const keysToRemove = [];
         for (let i = 0; i < localStorage.length; i++) {
           const key = localStorage.key(i);
-          if (key && (key.startsWith('sb-') || key.includes('auth-token') || key.includes('supabase.auth.token'))) {
+          if (key && (key.startsWith('sb-') || key.includes('auth-token'))) {
             keysToRemove.push(key);
           }
         }
         keysToRemove.forEach(key => localStorage.removeItem(key));
-        
-        // Also clear cached data
-        localStorage.removeItem('cached_owner_data');
-        localStorage.removeItem('cached_subscription');
       } catch (e) {
         console.error("Error manually clearing localStorage:", e);
-      }
-      
-      // 4. Redirect to login with reason
-      // Only redirect if we're not already on a public page or login page
-      if (window.location.pathname !== '/login' && 
-          !window.location.pathname.startsWith('/r/') && 
-          !window.location.pathname.startsWith('/b/') && 
-          window.location.pathname !== '/') {
-        window.location.href = '/login?reason=session_expired';
       }
     }
   };
 
   const handleAuthError = async (error: any) => {
-    if (!error) return false;
-    
-    // Check various error properties for refresh token issues
-    const msg = error?.message || error?.error_description || error?.error || String(error);
-    const isRefreshTokenError = 
-      msg.includes("Refresh Token Not Found") || 
-      msg.includes("Invalid Refresh Token") || 
-      msg.includes("refresh_token_not_found") ||
-      msg.includes("refresh_token_invalid") ||
-      msg.includes("Invalid token: token is expired");
-
-    if (isRefreshTokenError) {
+    const msg = error?.message || String(error);
+    if (msg.includes("Refresh Token Not Found") || msg.includes("Invalid Refresh Token") || msg.includes("refresh_token_not_found")) {
       console.warn("Stale refresh token detected, clearing session");
       await clearAuthSession();
       return true;
@@ -146,26 +116,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // Handle delayed owner creation (e.g., after email verification or Google OAuth)
       if (!finalOwnerData) {
-        const { data: userData, error: userError } = await retryAuthCall(() => supabase.auth.getUser());
-        const currentUser = userData?.user;
-        
-        if (userError) {
-            await handleAuthError(userError);
-            return;
-        }
-
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
         if (currentUser && currentUser.id === userId) {
           // Use businessName from metadata (email signup) or fallback to Google name/email
           const businessName = currentUser.user_metadata?.businessName || currentUser.user_metadata?.full_name || currentUser.email?.split('@')[0] || 'My Business';
           const reviewLink = currentUser.user_metadata?.reviewLink || '';
-          const country = currentUser.user_metadata?.country || 'India';
           const slug = businessName.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + crypto.randomUUID().slice(0, 6);
           
           const { data: newOwner, error: createError } = await supabase.from('owners').insert({
             id: userId,
             business_name: businessName,
             public_slug: slug,
-            country: country
           }).select().single();
 
           if (!createError && newOwner) {
@@ -178,7 +139,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             
             // Clear metadata to prevent re-running this if they delete their owner record
             if (currentUser.user_metadata?.businessName) {
-              await supabase.auth.updateUser({ data: { businessName: null, reviewLink: null, country: null } });
+              await supabase.auth.updateUser({ data: { businessName: null, reviewLink: null } });
             }
           }
         }
@@ -189,7 +150,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           try {
               const { data: businessData, error: bError } = await supabase
                 .from('businesses')
-                .select('id, review_link, subscription_status')
+                .select('id, review_link, custom_link_1, custom_link_label_1, subscription_status')
                 .eq('owner_id', userId)
                 .maybeSingle();
                 
@@ -215,6 +176,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                   finalOwnerData = { ...finalOwnerData, business_id: businessData.id };
                   if (businessData.review_link) {
                       finalOwnerData = { ...finalOwnerData, review_link: businessData.review_link };
+                  }
+                  if (businessData.custom_link_1) {
+                      finalOwnerData = { ...finalOwnerData, custom_link_1: businessData.custom_link_1 };
+                  }
+                  if (businessData.custom_link_label_1) {
+                      finalOwnerData = { ...finalOwnerData, custom_link_label_1: businessData.custom_link_label_1 };
                   }
               }
           } catch (e) {
@@ -365,11 +332,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const msg = result.error?.message || JSON.stringify(result.error) || '';
         
         // Check for refresh token errors - clear session immediately
-        if (msg.includes("Refresh Token Not Found") || 
-            msg.includes("Invalid Refresh Token") || 
-            msg.includes("refresh_token_not_found") ||
-            msg.includes("refresh_token_invalid") ||
-            msg.includes("Invalid token: token is expired")) {
+        if (msg.includes("Refresh Token Not Found") || msg.includes("Invalid Refresh Token") || msg.includes("refresh_token_not_found")) {
           console.warn("Stale refresh token detected in auth call, clearing session");
           await clearAuthSession();
           return result;
@@ -448,12 +411,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const session = result.data?.session;
             
             if (error) {
-                const msg = error.message || error.error_description || String(error);
-                if (msg.includes("Refresh Token Not Found") || 
-                    msg.includes("Invalid Refresh Token") || 
-                    msg.includes("refresh_token_not_found") ||
-                    msg.includes("refresh_token_invalid") ||
-                    msg.includes("Invalid token: token is expired")) {
+                const msg = error.message || String(error);
+                if (msg.includes("Refresh Token Not Found") || msg.includes("Invalid Refresh Token") || msg.includes("refresh_token_not_found")) {
                     console.warn("Stale refresh token detected, clearing session");
                     await clearAuthSession();
                     return;
@@ -476,15 +435,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
         } catch (error: any) {
             if (mounted) {
-                const msg = error?.message || error?.error_description || String(error);
+                const msg = error?.message || String(error);
                 // If onAuthStateChange already gave us a user (authResolved is true), don't treat this as a fatal error
                 if (authResolved) {
                     console.warn("getSession failed but auth was already resolved:", error);
-                } else if (msg.includes("Refresh Token Not Found") || 
-                           msg.includes("Invalid Refresh Token") || 
-                           msg.includes("refresh_token_not_found") ||
-                           msg.includes("refresh_token_invalid") ||
-                           msg.includes("Invalid token: token is expired")) {
+                } else if (msg.includes("Refresh Token Not Found") || msg.includes("Invalid Refresh Token") || msg.includes("refresh_token_not_found")) {
                     console.warn("Stale session detected during initialization:", msg);
                     await clearAuthSession();
                 } else if (msg.includes("Lock broken") || msg.includes("lock")) {
@@ -519,9 +474,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (mounted) {
           authResolved = true;
-          
-          if ((event as string) === 'TOKEN_REFRESH_REVOKED' || event === 'SIGNED_OUT') {
-             console.warn(`Auth event: ${event}, clearing session`);
+          if ((event as string) === 'TOKEN_REFRESH_REVOKED') {
+             console.warn("Token revoked");
              await clearAuthSession();
              setLoading(false);
              return;
@@ -562,23 +516,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signUp = async (email: string, password: string, businessName: string, reviewLink: string) => {
-    // Auto-detect country for the database
-    let detectedCountry = 'India';
-    try {
-      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      if (!timezone.includes('Kolkata') && !timezone.includes('Calcutta')) {
-        detectedCountry = 'United States'; // Default international
-      }
-    } catch (e) {}
-
     const { data: authData, error: authError } = await retryAuthCall(() => supabase.auth.signUp({
       email,
       password,
       options: {
         data: {
           businessName,
-          reviewLink,
-          country: detectedCountry
+          reviewLink
         }
       }
     }));
@@ -600,7 +544,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         id: authData.user.id,
         business_name: businessName,
         public_slug: slug,
-        country: detectedCountry
       });
 
       if (dbError) {

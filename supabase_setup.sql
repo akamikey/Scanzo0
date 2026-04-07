@@ -36,6 +36,8 @@ CREATE TABLE public.businesses (
     name TEXT,
     review_link TEXT,
     website_link TEXT,
+    custom_link_1 TEXT,
+    custom_link_label_1 TEXT,
     subscription_status TEXT DEFAULT 'inactive',
     slug TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,

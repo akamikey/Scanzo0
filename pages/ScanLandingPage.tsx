@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { Star, Building2, ChevronRight, AlertCircle, Lock } from 'lucide-react';
+import { Star, Building2, ChevronRight, AlertCircle, Lock, ExternalLink } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export default function ScanLandingPage() {
@@ -10,6 +10,8 @@ export default function ScanLandingPage() {
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [reviewLink, setReviewLink] = useState<string | null>(null);
   const [websiteLink, setWebsiteLink] = useState<string | null>(null);
+  const [customLink, setCustomLink] = useState<string | null>(null);
+  const [customLinkLabel, setCustomLinkLabel] = useState<string | null>(null);
   const [businessSlug, setBusinessSlug] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -35,7 +37,7 @@ export default function ScanLandingPage() {
           // 1. Get business info from ID
           const { data: biz, error: bizError } = await supabase
             .from('businesses')
-            .select('owner_id, review_link, website_link, subscription_status')
+            .select('owner_id, review_link, website_link, custom_link_1, custom_link_label_1, subscription_status')
             .eq('id', id)
             .maybeSingle();
 
@@ -49,6 +51,8 @@ export default function ScanLandingPage() {
           ownerId = biz.owner_id;
           setReviewLink(biz.review_link);
           setWebsiteLink(biz.website_link);
+          setCustomLink(biz.custom_link_1);
+          setCustomLinkLabel(biz.custom_link_label_1);
 
           // Get owner info
           const { data: owner } = await supabase
@@ -83,13 +87,15 @@ export default function ScanLandingPage() {
           // 2. Get links and subscription
           const { data: biz } = await supabase
             .from('businesses')
-            .select('review_link, website_link, subscription_status')
+            .select('review_link, website_link, custom_link_1, custom_link_label_1, subscription_status')
             .eq('owner_id', ownerId)
             .maybeSingle();
 
           if (biz) {
             setReviewLink(biz.review_link);
             setWebsiteLink(biz.website_link);
+            setCustomLink(biz.custom_link_1);
+            setCustomLinkLabel(biz.custom_link_label_1);
           }
         }
 
@@ -288,6 +294,40 @@ export default function ScanLandingPage() {
               <Lock size={16} className="text-slate-300 dark:text-slate-600" />
             )}
           </motion.div>
+
+          {/* Custom Link Card */}
+          {customLink && (
+            <motion.div
+              whileHover={!isExpired ? { scale: 1.02, y: -4 } : {}}
+              whileTap={!isExpired ? { scale: 0.98 } : {}}
+              onClick={() => {
+                if (isExpired) return;
+                window.location.href = customLink.startsWith('http') ? customLink : `https://${customLink}`;
+              }}
+              className={`p-6 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border border-white/40 dark:border-white/5 shadow-xl rounded-3xl text-left flex items-center gap-5 group transition-all ${
+                isExpired ? 'opacity-60 grayscale cursor-not-allowed' : 'cursor-pointer'
+              }`}
+            >
+              <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 transition-all shadow-sm ${
+                isExpired ? 'bg-gray-200 dark:bg-slate-800 text-gray-400' : 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-500 group-hover:bg-indigo-500 group-hover:text-white'
+              }`}>
+                {isExpired ? <Lock size={24} /> : <ExternalLink size={28} />}
+              </div>
+              <div className="flex-1">
+                <h3 className={`font-bold text-lg ${isExpired ? 'text-slate-400' : 'text-slate-800 dark:text-white'}`}>
+                  {isExpired ? 'Link Locked' : (customLinkLabel || 'Custom Link')}
+                </h3>
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+                  {isExpired ? 'Business inactive' : 'Visit our external link'}
+                </p>
+              </div>
+              {!isExpired ? (
+                <ChevronRight className="text-slate-300 dark:text-slate-600 group-hover:text-slate-500 dark:group-hover:text-slate-400 transition-all" />
+              ) : (
+                <Lock size={16} className="text-slate-300 dark:text-slate-600" />
+              )}
+            </motion.div>
+          )}
 
         </div>
       </motion.div>
