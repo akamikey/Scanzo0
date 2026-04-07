@@ -212,19 +212,20 @@ const SubscribePage: React.FC = () => {
       });
 
       console.log(`[Payment] Create order response status: ${res.status}`);
+      
       let data;
-      const contentType = res.headers.get('content-type');
-      if (contentType && contentType.includes('application/json')) {
+      const contentType = res.headers.get("content-type");
+      if (contentType && contentType.indexOf("application/json") !== -1) {
         data = await res.json();
+        console.log('[Payment] Create order response data:', data);
       } else {
         const text = await res.text();
         console.error('[Payment] Non-JSON response:', text);
-        throw new Error(`Server error: ${res.status}. Please try again later.`);
+        throw new Error(`Server returned ${res.status}. Please check backend logs.`);
       }
-      console.log('[Payment] Create order response data:', data);
 
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to create order');
+        throw new Error(data.details || data.error || 'Failed to create order');
       }
 
       if (data.order_id) {

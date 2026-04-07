@@ -9,15 +9,6 @@ import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 import { GoogleGenAI } from "@google/genai";
 
-// Prevent unhandled rejections from crashing the server
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('[Server] Unhandled Rejection at:', promise, 'reason:', reason);
-});
-
-process.on('uncaughtException', (error) => {
-  console.error('[Server] Uncaught Exception:', error);
-});
-
 // Ensure .env variables take precedence
 dotenv.config({ override: true });
 
@@ -308,11 +299,11 @@ try {
 
 const getRazorpayInstance = () => {
   try {
-    let key_id = (process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID)?.trim();
-    let key_secret = (process.env.RAZORPAY_KEY_SECRET || process.env.RAZORPAY_KEY_SECRET || process.env.VITE_RAZORPAY_KEY_SECRET)?.trim();
+    let key_id = (process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID || 'rzp_live_STxlKmH3jUfhCg')?.trim();
+    let key_secret = (process.env.RAZORPAY_KEY_SECRET || process.env.RAZORPAY_KEY_SECRETE || process.env.VITE_RAZORPAY_KEY_SECRET || 'QyH1Z6s0wV6N23z7XRmEe53q')?.trim();
 
     if (!key_id || !key_secret) {
-      console.warn('[Server] Razorpay keys missing in environment. Key ID present:', !!key_id);
+      console.warn('[Server] Razorpay keys missing in environment');
       return null;
     }
 
@@ -545,7 +536,6 @@ app.post('/api/create-subscription', async (req, res) => {
 
 // 1.5 Create Order
 app.post('/api/create-order', async (req, res) => {
-  console.log('[API] /api/create-order called');
   try {
     const { amount, planId, razorpayPlanId, userId } = req.body || {};
     console.log(`[API] Create Order Request - Amount: ${amount}, Plan: ${planId}, RazorpayPlan: ${razorpayPlanId}, User: ${userId}`);
@@ -558,33 +548,47 @@ app.post('/api/create-order', async (req, res) => {
     const rzp = getRazorpayInstance();
     if (!rzp) {
       console.error('[API] Razorpay instance missing - check environment variables');
-      return res.status(400).json({ error: 'Razorpay configuration missing on server. Please check environment variables.' });
+      const missingKeys = [];
+      if (!process.env.RAZORPAY_KEY_ID && !process.env.VITE_RAZORPAY_KEY_ID) missingKeys.push('RAZORPAY_KEY_ID');
+      if (!process.env.RAZORPAY_KEY_SECRET && !process.env.RAZORPAY_KEY_SECRETE && !process.env.VITE_RAZORPAY_KEY_SECRET) missingKeys.push('RAZORPAY_KEY_SECRET');
+      
+      return res.status(500).json({ 
+        error: 'Razorpay configuration missing on server',
+        details: `Missing environment variables: ${missingKeys.join(', ')}. Please set them in the Settings menu.`,
+        code: 'CONFIG_ERROR'
+      });
     }
 
-    console.log('[API] Calling rzp.orders.create with amount:', Math.round(amount * 100));
-    const order = await rzp.orders.create({
+    console.log('[API] Calling rzp.orders.create...');
+    const orderOptions: any = {
       amount: Math.round(amount * 100), // Convert to paise and ensure integer
       currency: "INR",
-      receipt: `rcpt_${Date.now()}_${String(userId).substring(0, 8)}`,
+      receipt: `rcpt_${Date.now()}_${userId.substring(0, 8)}`,
       notes: {
         user_id: userId,
-        plan_name: planId,
-        ...(razorpayPlanId ? { razorpay_plan_id: razorpayPlanId } : {})
+        plan_name: planId || 'unknown',
       }
-    });
+    };
+
+    // Only add razorpay_plan_id if it's defined and not null
+    if (razorpayPlanId) {
+      orderOptions.notes.razorpay_plan_id = razorpayPlanId;
+    }
+
+    const order = await rzp.orders.create(orderOptions);
 
     console.log('[API] Order created successfully:', order.id);
 
     res.json({
       order_id: order.id,
-      key_id: process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID || 'rzp_live_STxlKmH3jUfhCg',
+      key_id: (process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID || 'rzp_live_STxlKmH3jUfhCg').trim(),
       amount: order.amount,
       currency: order.currency
     });
   } catch (err: any) {
     console.error('[API] Razorpay Create Order Error:', err);
     res.status(500).json({ 
-      error: err.error?.description || err.message || 'Internal Server Error',
+      error: err.error?.description || err.message || 'Unknown Error',
       details: err.message,
       code: err.code
     });
@@ -620,7 +624,7 @@ app.post('/api/restore-purchase', async (req, res) => {
       const rzp = getRazorpayInstance();
       if (!rzp) {
           console.error('[Restore] Razorpay instance missing - cannot fetch subscriptions');
-          return res.status(400).json({ error: 'Razorpay configuration missing on server. Please check environment variables.' });
+          return res.status(500).json({ error: 'Razorpay configuration missing' });
       }
 
       // 0. Check specific payment if provided
@@ -815,65 +819,69 @@ console.log(`[Server] Dist Exists: ${distExists}`);
 
 const isProduction = process.env.NODE_ENV === 'production' || process.env.npm_lifecycle_event === 'start';
 
-// Force production mode serving if dist exists AND we are in production mode
-if (distExists && isProduction && !process.env.VERCEL) {
-  console.log('[Server] Serving static files from dist folder...');
-  
-  // Serve static assets
-  app.use(express.static(distPath));
-
-  // SPA Fallback for all non-API routes
-  app.get('*', (req, res) => {
-    if (!req.path.startsWith('/api')) {
-      const indexPath = path.join(distPath, 'index.html');
-      if (fs.existsSync(indexPath)) {
-         res.sendFile(indexPath);
-      } else {
-         console.error(`[Server] Error: index.html not found at ${indexPath}`);
-         res.status(500).send('<h1>Application Error</h1><p>Application build found but index.html is missing. Please run npm run build.</p>');
-      }
-    }
-  });
-} else if (!process.env.VERCEL) {
-  console.log('[Server] Starting Vite Dev Server...');
-  try {
-      // Dynamic import for Vite
-      const viteModule = await import('vite');
-      const vite = await viteModule.createServer({
-        server: { middlewareMode: true },
-        appType: 'spa',
-      });
-      app.use(vite.middlewares);
-  } catch (e) {
-      console.error('[Server] Failed to start Vite Dev Server:', e);
-      app.get('*', (req, res) => {
-          res.status(500).send('<h1>Application Error</h1><p>Failed to start development server. Please check logs.</p>');
-      });
-  }
-} else {
-  console.log('[Server] Running in Vercel Serverless mode. Static files served by Vercel.');
-}
-
-// Global Fallback for unmatched routes (should be caught by above logic, but just in case)
-app.use((req, res) => {
-    res.status(404).send('<h1>404 Not Found</h1><p>The requested URL was not found on this server (Express fallback).</p>');
-});
-
-// For Vercel deployment, we export the app and only listen if not in a serverless environment
-if (!process.env.VERCEL) {
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+const setupServer = async () => {
+  // Force production mode serving if dist exists AND we are in production mode
+  if (distExists && isProduction && !process.env.VERCEL) {
+    console.log('[Server] Serving static files from dist folder...');
     
-    // Diagnostic Logging
-    console.log('--- Razorpay Configuration Diagnostics ---');
-    console.log(`Key ID Present: ${!!process.env.RAZORPAY_KEY_ID} (Using: ${process.env.RAZORPAY_KEY_ID ? 'Custom Env Var' : 'Default Fallback'})`);
-    console.log(`Key Secret Present: ${!!process.env.RAZORPAY_KEY_SECRET}`);
-    console.log(`Plan Monthly: ${PLAN_CONFIG['monthly'].id} (${process.env.RAZORPAY_PLAN_MONTHLY ? 'Custom' : 'Default'})`);
-    console.log(`Plan Biannual: ${PLAN_CONFIG['biannual'].id} (${process.env.RAZORPAY_PLAN_BIANNUAL ? 'Custom' : 'Default'})`);
-    console.log(`Plan Annual: ${PLAN_CONFIG['annual'].id} (${process.env.RAZORPAY_PLAN_ANNUAL ? 'Custom' : 'Default'})`);
-    console.log(`Webhook URL: ${process.env.APP_URL || 'https://<YOUR_APP_URL>'}/api/webhook/razorpay`);
-    console.log('------------------------------------------');
+    // Serve static assets
+    app.use(express.static(distPath));
+
+    // SPA Fallback for all non-API routes
+    app.get('*', (req, res) => {
+      if (!req.path.startsWith('/api')) {
+        const indexPath = path.join(distPath, 'index.html');
+        if (fs.existsSync(indexPath)) {
+           res.sendFile(indexPath);
+        } else {
+           console.error(`[Server] Error: index.html not found at ${indexPath}`);
+           res.status(500).send('<h1>Application Error</h1><p>Application build found but index.html is missing. Please run npm run build.</p>');
+        }
+      }
+    });
+  } else if (!process.env.VERCEL) {
+    console.log('[Server] Starting Vite Dev Server...');
+    try {
+        // Dynamic import for Vite
+        const viteModule = await import('vite');
+        const vite = await viteModule.createServer({
+          server: { middlewareMode: true },
+          appType: 'spa',
+        });
+        app.use(vite.middlewares);
+    } catch (e) {
+        console.error('[Server] Failed to start Vite Dev Server:', e);
+        app.get('*', (req, res) => {
+            res.status(500).send('<h1>Application Error</h1><p>Failed to start development server. Please check logs.</p>');
+        });
+    }
+  } else {
+    console.log('[Server] Running in Vercel Serverless mode. Static files served by Vercel.');
+  }
+
+  // Global Fallback for unmatched routes (should be caught by above logic, but just in case)
+  app.use((req, res) => {
+      res.status(404).send('<h1>404 Not Found</h1><p>The requested URL was not found on this server (Express fallback).</p>');
   });
-}
+
+  // For Vercel deployment, we export the app and only listen if not in a serverless environment
+  if (!process.env.VERCEL) {
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`Server running on http://localhost:${PORT}`);
+      
+      // Diagnostic Logging
+      console.log('--- Razorpay Configuration Diagnostics ---');
+      console.log(`Key ID Present: ${!!process.env.RAZORPAY_KEY_ID} (Using: ${process.env.RAZORPAY_KEY_ID ? 'Custom Env Var' : 'Default Fallback'})`);
+      console.log(`Key Secret Present: ${!!process.env.RAZORPAY_KEY_SECRET}`);
+      console.log(`Plan Monthly: ${PLAN_CONFIG['monthly'].id} (${process.env.RAZORPAY_PLAN_MONTHLY ? 'Custom' : 'Default'})`);
+      console.log(`Plan Biannual: ${PLAN_CONFIG['biannual'].id} (${process.env.RAZORPAY_PLAN_BIANNUAL ? 'Custom' : 'Default'})`);
+      console.log(`Plan Annual: ${PLAN_CONFIG['annual'].id} (${process.env.RAZORPAY_PLAN_ANNUAL ? 'Custom' : 'Default'})`);
+      console.log(`Webhook URL: ${process.env.APP_URL || 'https://<YOUR_APP_URL>'}/api/webhook/razorpay`);
+      console.log('------------------------------------------');
+    });
+  }
+};
+
+setupServer();
 
 export default app;

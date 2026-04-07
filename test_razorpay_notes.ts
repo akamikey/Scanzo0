@@ -15,7 +15,8 @@ async function run() {
       receipt: `rcpt_${Date.now()}`,
       notes: {
         user_id: "test_user",
-        plan_name: "test_plan"
+        plan_name: "test_plan",
+        razorpay_plan_id: null
       }
     });
     console.log(order);
