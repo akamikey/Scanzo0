@@ -12,7 +12,6 @@ interface SidebarProps {
 
 const NAV_ITEMS = [
   { path: '/dashboard', label: 'Dashboard', icon: Home },
-  { path: '/demo', label: 'Demo Video', icon: Play },
   { path: '/reviews', label: 'Reviews', icon: Star },
   { path: '/insights', label: 'Insights', icon: BarChart2 },
   { path: '/google-link', label: 'Google Link', icon: LinkIcon },

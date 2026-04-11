@@ -38,32 +38,8 @@ const clearStaleSession = () => {
 
 // Intercept auth errors in a way that works for most calls
 // Note: This is a bit of a hack since Supabase JS doesn't have official interceptors
-const originalFrom = supabaseClient.from.bind(supabaseClient);
-supabaseClient.from = ((table: string) => {
-  const queryBuilder = originalFrom(table);
-  
-  // We wrap the thenable to catch errors
-  const originalThen = queryBuilder.then.bind(queryBuilder);
-  queryBuilder.then = (onfulfilled?: any, onrejected?: any) => {
-    return originalThen((result: any) => {
-      if (result?.error) {
-        const msg = result.error.message || String(result.error);
-        if (msg.includes("Refresh Token Not Found") || msg.includes("Invalid Refresh Token") || msg.includes("refresh_token_not_found")) {
-          clearStaleSession();
-        }
-      }
-      return onfulfilled ? onfulfilled(result) : result;
-    }, (error: any) => {
-      const msg = error?.message || String(error);
-      if (msg.includes("Refresh Token Not Found") || msg.includes("Invalid Refresh Token") || msg.includes("refresh_token_not_found")) {
-        clearStaleSession();
-      }
-      return onrejected ? onrejected(error) : Promise.reject(error);
-    });
-  };
-  
-  return queryBuilder;
-}) as any;
+// Removed broken supabaseClient.from wrapper that caused 'bind' errors
+
 
 // Wrap auth methods too
 const originalGetUser = supabaseClient.auth.getUser.bind(supabaseClient.auth);

@@ -11,6 +11,7 @@ interface OwnerData {
   public_slug: string;
   location?: string;
   logo_url?: string;
+  country?: string;
 }
 
 interface SubscriptionData {

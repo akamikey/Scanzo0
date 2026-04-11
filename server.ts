@@ -7,7 +7,6 @@ import crypto from 'crypto';
 import fs from 'fs';
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
-import { GoogleGenAI } from "@google/genai";
 
 // Ensure .env variables take precedence
 dotenv.config({ override: true });
@@ -334,30 +333,7 @@ const getRazorpayInstance = () => {
   }
 };
 
-let startupTestResult = { status: 'not_run', error: null as string | null };
-
-// Initial check and startup test
-const runStartupTest = async () => {
-    const rzp = getRazorpayInstance();
-    if (rzp) {
-        console.log(`[Server] Razorpay instance created. Testing authentication...`);
-        try {
-            const plans = await rzp.plans.all({ count: 1 });
-            console.log(`[Server] Razorpay Startup Test: SUCCESS! Found ${plans.items.length} plans.`);
-            startupTestResult = { status: 'success', error: null };
-        } catch (err: any) {
-            const errorDesc = err.error?.description || err.message || 'Unknown Error';
-            console.error(`[Server] Razorpay Startup Test: FAILED! Error: ${errorDesc}`);
-            console.error(`[Server] Please verify your RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in the Settings menu.`);
-            startupTestResult = { status: 'failed', error: errorDesc };
-        }
-    } else {
-        console.warn(`[Server] Razorpay keys missing or invalid in environment. Startup test skipped.`);
-        startupTestResult = { status: 'missing_keys', error: 'Keys missing or invalid' };
-    }
-};
-
-runStartupTest();
+// Initial check and startup test removed to prevent Vercel cold start issues.
 
 // API Routes
 
@@ -842,8 +818,9 @@ const setupServer = async () => {
   } else if (!process.env.VERCEL) {
     console.log('[Server] Starting Vite Dev Server...');
     try {
-        // Dynamic import for Vite
-        const viteModule = await import('vite');
+        // Dynamic import for Vite hidden from static analysis
+        const viteName = 'vite';
+        const viteModule = await import(viteName);
         const vite = await viteModule.createServer({
           server: { middlewareMode: true },
           appType: 'spa',
