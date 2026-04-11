@@ -141,23 +141,32 @@ const SubscribePage: React.FC = () => {
       if (isSuccess) {
         setPaymentStatus('success');
         
-        // Step 3: Celebration
-        confetti({
-          particleCount: 150,
-          spread: 70,
-          origin: { y: 0.6 },
-          colors: ['#22c55e', '#4ade80', '#ffffff']
-        });
+        // Step 3: Celebration - Multiple bursts for a premium feel
+        const fire = (particleRatio: number, opts: any) => {
+          confetti({
+            ...opts,
+            particleCount: Math.floor(200 * particleRatio),
+            origin: { y: 0.7 },
+            colors: ['#22c55e', '#4ade80', '#ffffff', '#3b82f6'],
+            zIndex: 1000
+          });
+        };
+
+        fire(0.25, { spread: 26, startVelocity: 55 });
+        fire(0.2, { spread: 60 });
+        fire(0.35, { spread: 100, decay: 0.91, scalar: 0.8 });
+        fire(0.1, { spread: 120, startVelocity: 25, decay: 0.92, scalar: 1.2 });
+        fire(0.1, { spread: 120, startVelocity: 45 });
 
         // Refresh data to update subscription status in context
         refreshData();
 
-        // Step 6: Return to normal after 5 seconds
+        // Step 6: Redirect to dashboard after 4 seconds of celebration
         setTimeout(() => {
           setPaymentStatus('idle');
-          // Clear search params without refresh
           setSearchParams({});
-        }, 5000);
+          navigate('/dashboard');
+        }, 4000);
       } else {
         setPaymentStatus('cancelled');
         setErrorDetails({ message: errorMessage });
@@ -476,8 +485,21 @@ const SubscribePage: React.FC = () => {
                         >
                           <Check size={48} strokeWidth={4} />
                         </motion.div>
-                        <h3 className="text-2xl font-black text-green-600 dark:text-green-400 mb-1">Subscription Activated 🎉</h3>
-                        <p className="font-bold text-green-700 dark:text-green-300">Your plan is now active</p>
+                        <h3 className="text-3xl font-black text-green-600 dark:text-green-400 mb-2 drop-shadow-sm">
+                          Subscription Activated 🎉
+                        </h3>
+                        <p className="font-bold text-green-700 dark:text-green-300 text-lg">
+                          Welcome to Premium!
+                        </p>
+                        <motion.div 
+                          initial={{ width: 0 }}
+                          animate={{ width: '100%' }}
+                          transition={{ duration: 3.5, ease: "linear" }}
+                          className="h-1 bg-green-500 mt-6 rounded-full max-w-[200px]"
+                        />
+                        <p className="text-[10px] text-green-600/60 mt-2 font-bold uppercase tracking-widest">
+                          Redirecting to Dashboard...
+                        </p>
                       </motion.div>
                     )}
                   </AnimatePresence>
