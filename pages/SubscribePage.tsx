@@ -105,7 +105,7 @@ const SubscribePage: React.FC = () => {
     return () => clearInterval(interval);
   }, []);
 
-  const handleSuccessFlow = async (planId: string | null, paymentId?: string) => {
+  const handleSuccessFlow = async (planId: string | null, paymentId?: string, subscriptionId?: string) => {
     setActivePlanId(planId);
     setPaymentStatus('activating');
     setErrorDetails(null);
@@ -122,7 +122,7 @@ const SubscribePage: React.FC = () => {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify({ paymentId, planId })
+          body: JSON.stringify({ paymentId, planId, subscriptionId })
         });
         if (res.ok) {
           isSuccess = true;
@@ -197,27 +197,25 @@ const SubscribePage: React.FC = () => {
       const token = session?.access_token;
       console.log(`[Payment] Initiating order for plan: ${plan.id}, price: ${plan.price}`);
       
-      const res = await fetch('/api/create-order', {
+      const res = await fetch('/api/create-subscription', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           ...(token ? { 'Authorization': `Bearer ${token}` } : {})
         },
         body: JSON.stringify({ 
-          amount: plan.price, 
           planId: plan.id, 
-          razorpayPlanId: plan.planId,
           userId: user.id 
         })
       });
 
-      console.log(`[Payment] Create order response status: ${res.status}`);
+      console.log(`[Payment] Create subscription response status: ${res.status}`);
       
       let data;
       const contentType = res.headers.get("content-type");
       if (contentType && contentType.indexOf("application/json") !== -1) {
         data = await res.json();
-        console.log('[Payment] Create order response data:', data);
+        console.log('[Payment] Create subscription response data:', data);
       } else {
         const text = await res.text();
         console.error('[Payment] Non-JSON response:', text);
@@ -225,20 +223,20 @@ const SubscribePage: React.FC = () => {
       }
 
       if (!res.ok) {
-        throw new Error(data.details || data.error || 'Failed to create order');
+        throw new Error(data.details || data.error || 'Failed to create subscription');
       }
 
-      if (data.order_id) {
+      if (data.id) {
         const options = {
           key: data.key_id || 'rzp_live_STxlKmH3jUfhCg', // Fallback to live key
           name: "Scanzo",
           description: `Subscription for ${plan.name}`,
           image: "https://scanzo.in/logo.png",
-          order_id: data.order_id,
+          subscription_id: data.id,
           handler: function (response: any) {
             console.log('[Payment] Success response:', response);
             setProcessingId(null);
-            handleSuccessFlow(plan.id, response.razorpay_payment_id);
+            handleSuccessFlow(plan.id, response.razorpay_payment_id, response.razorpay_subscription_id);
           },
           prefill: {
             name: user.email?.split('@')[0] || 'User',

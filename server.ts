@@ -363,6 +363,72 @@ const PLAN_CONFIG: Record<string, { id: string | undefined, total_count: number 
   }
 };
 
+const PLAN_DETAILS: Record<string, any> = {
+  'monthly': {
+    period: 'monthly',
+    interval: 1,
+    item: { name: 'Scanzo Monthly Plan', amount: 25000, currency: 'INR', description: 'Monthly subscription for Scanzo' },
+    notes: { internal_name: 'monthly' }
+  },
+  'biannual': {
+    period: 'monthly', // Razorpay uses monthly period with interval 6 for biannual
+    interval: 6,
+    item: { name: 'Scanzo 6 Months Plan', amount: 125000, currency: 'INR', description: '6 Months subscription for Scanzo' },
+    notes: { internal_name: 'biannual' }
+  },
+  'annual': {
+    period: 'yearly',
+    interval: 1,
+    item: { name: 'Scanzo Annual Plan', amount: 200000, currency: 'INR', description: 'Annual subscription for Scanzo' },
+    notes: { internal_name: 'annual' }
+  }
+};
+
+async function getOrCreateRazorpayPlan(rzp: any, planType: string): Promise<string> {
+    const configId = PLAN_CONFIG[planType]?.id;
+    
+    // 1. Verify existing hardcoded/env plan ID
+    if (configId && configId.startsWith('plan_')) {
+        try {
+            const plan = await rzp.plans.fetch(configId);
+            if (plan && plan.id) return plan.id;
+        } catch (e) {
+            console.log(`[API] Plan ${configId} not found or invalid. Will attempt to find/create one.`);
+        }
+    }
+
+    // 2. Search for existing plan in Razorpay account
+    try {
+        const plans = await rzp.plans.all({ count: 100 });
+        const existingPlan = plans.items.find((p: any) => 
+            p.notes?.internal_name === planType || 
+            p.item?.name === PLAN_DETAILS[planType]?.item?.name
+        );
+        if (existingPlan) {
+            console.log(`[API] Found existing plan for ${planType}: ${existingPlan.id}`);
+            if (PLAN_CONFIG[planType]) PLAN_CONFIG[planType].id = existingPlan.id;
+            return existingPlan.id;
+        }
+    } catch (e) {
+        console.error('[API] Error fetching plans:', e);
+    }
+
+    // 3. Create new plan if not found
+    try {
+        console.log(`[API] Creating new plan for ${planType}...`);
+        const details = PLAN_DETAILS[planType];
+        if (!details) throw new Error(`No plan details configured for ${planType}`);
+        
+        const newPlan = await rzp.plans.create(details);
+        console.log(`[API] Created new plan: ${newPlan.id}`);
+        if (PLAN_CONFIG[planType]) PLAN_CONFIG[planType].id = newPlan.id;
+        return newPlan.id;
+    } catch (e) {
+        console.error('[API] Error creating plan:', e);
+        throw e;
+    }
+}
+
 const FALLBACK_LINKS: Record<string, string> = {
   'monthly': 'https://rzp.io/rzp/nsZoidF',
   'biannual': 'https://rzp.io/rzp/hkHwFb9S',
@@ -411,21 +477,19 @@ app.post('/api/create-subscription', async (req, res) => {
         });
     };
 
-    // If no Razorpay Plan ID is configured, use fallback link immediately
-    if (!razorpayPlanId || 
-        razorpayPlanId.includes('plan_monthly_id') || 
-        razorpayPlanId.includes('plan_biannual_id') || 
-        razorpayPlanId.includes('plan_annual_id')) {
-      
-      console.log(`No valid Razorpay Plan ID configured for '${planId}', using fallback link.`);
-      return returnFallback();
-    }
-
     const rzp = getRazorpayInstance();
 
     if (!rzp) {
         console.log(`[API] Razorpay instance could not be created (missing keys). Using fallback for ${planId}.`);
         return returnFallback();
+    }
+
+    try {
+      // Automatically get or create the correct plan ID for this account
+      razorpayPlanId = await getOrCreateRazorpayPlan(rzp, planId);
+    } catch (e) {
+      console.error(`[API] Failed to get or create Razorpay plan for ${planId}:`, e);
+      return returnFallback();
     }
 
     const keyId = (process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID || 'MISSING').trim();
@@ -438,7 +502,6 @@ app.post('/api/create-subscription', async (req, res) => {
         total_count: planConfig.total_count,
         quantity: 1,
         customer_notify: 1,
-        // Removed start_at to see if it resolves 500 error
         notes: {
           user_id: userId,
           internal_plan_id: planId
@@ -577,7 +640,7 @@ app.post('/api/restore-purchase', async (req, res) => {
   if (!authHeader) return res.status(401).json({ error: 'Missing authorization header' });
 
   const token = authHeader.split(' ')[1];
-  const { paymentId, planId: requestedPlanId } = req.body || {};
+  const { paymentId, planId: requestedPlanId, subscriptionId } = req.body || {};
   
   // Verify user
   const { data: { user }, error: userError } = await supabase!.auth.getUser(token);
@@ -587,7 +650,7 @@ app.post('/api/restore-purchase', async (req, res) => {
   }
 
   const email = user.email;
-  console.log(`Restoring purchase for ${email} (${user.id}), paymentId: ${paymentId}`);
+  console.log(`Restoring purchase for ${email} (${user.id}), paymentId: ${paymentId}, subscriptionId: ${subscriptionId}`);
 
   let foundValidPayment = false;
   let planId = requestedPlanId || 'monthly'; // Default fallback
@@ -603,8 +666,37 @@ app.post('/api/restore-purchase', async (req, res) => {
           return res.status(500).json({ error: 'Razorpay configuration missing' });
       }
 
-      // 0. Check specific payment if provided
-      if (paymentId) {
+      // 0. Check specific subscription if provided
+      if (subscriptionId) {
+          try {
+              const sub = await rzp.subscriptions.fetch(subscriptionId);
+              if (sub && (sub.status === 'active' || sub.status === 'authenticated')) {
+                  foundValidPayment = true;
+                  isSubscription = true;
+                  razorpayId = sub.id;
+                  if (sub.plan_id.includes('monthly') || sub.plan_id === PLAN_CONFIG['monthly'].id) planId = 'monthly';
+                  else if (sub.plan_id.includes('annual') || sub.plan_id === PLAN_CONFIG['annual'].id) planId = 'annual';
+                  else if (sub.plan_id.includes('biannual') || sub.plan_id === PLAN_CONFIG['biannual'].id) planId = 'biannual';
+                  else if (sub.plan_id.includes('test') || sub.plan_id === PLAN_CONFIG['test']?.id) planId = 'test';
+                  else planId = requestedPlanId || 'monthly';
+                  
+                  if (sub.current_end) {
+                      paymentDate = new Date(sub.current_end * 1000);
+                  } else {
+                      // If authenticated but not yet active, set a default future date
+                      paymentDate = new Date();
+                      if (planId === 'annual') paymentDate.setFullYear(paymentDate.getFullYear() + 1);
+                      else if (planId === 'biannual') paymentDate.setMonth(paymentDate.getMonth() + 6);
+                      else paymentDate.setMonth(paymentDate.getMonth() + 1);
+                  }
+              }
+          } catch (e) {
+              console.error(`[Restore] Failed to fetch specific subscription ${subscriptionId}:`, e);
+          }
+      }
+
+      // 0.5 Check specific payment if provided and subscription wasn't found
+      if (paymentId && !foundValidPayment) {
           try {
               const pay = await rzp.payments.fetch(paymentId);
               if (pay && pay.status === 'captured') {
@@ -818,9 +910,9 @@ const setupServer = async () => {
   } else if (!process.env.VERCEL) {
     console.log('[Server] Starting Vite Dev Server...');
     try {
-        // Dynamic import for Vite hidden from static analysis
-        const viteName = 'vite';
-        const viteModule = await import(viteName);
+        // Dynamic import for Vite completely hidden from static analysis
+        const requireVite = new Function('return import("vite")');
+        const viteModule = await requireVite();
         const vite = await viteModule.createServer({
           server: { middlewareMode: true },
           appType: 'spa',
