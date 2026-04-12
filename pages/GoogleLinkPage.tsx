@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
-import { Loader2, CheckCircle2, AlertCircle, Edit2, Save, Globe } from 'lucide-react';
+import { Loader2, CheckCircle2, AlertCircle, Edit2, Save, Globe, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import Footer from '../components/Footer';
@@ -15,13 +15,6 @@ const GoogleLinkPage: React.FC = () => {
   const [loadingReview, setLoadingReview] = useState(false);
   const [errorReview, setErrorReview] = useState('');
   const [successReview, setSuccessReview] = useState(false);
-
-  // Website Link State
-  const [websiteLink, setWebsiteLink] = useState('');
-  const [isEditingWebsite, setIsEditingWebsite] = useState(true);
-  const [loadingWebsite, setLoadingWebsite] = useState(false);
-  const [errorWebsite, setErrorWebsite] = useState('');
-  const [successWebsite, setSuccessWebsite] = useState(false);
 
   // Custom Link 1 State
   const [customLink1, setCustomLink1] = useState('');
@@ -41,7 +34,7 @@ const GoogleLinkPage: React.FC = () => {
     try {
       const { data, error } = await supabase
         .from('businesses')
-        .select('review_link, website_link, custom_link_1, custom_link_label_1')
+        .select('review_link, custom_link_1, custom_link_label_1')
         .eq('owner_id', user?.id)
         .maybeSingle();
         
@@ -49,10 +42,6 @@ const GoogleLinkPage: React.FC = () => {
         if (data.review_link) {
           setReviewLink(data.review_link);
           setIsEditingReview(false);
-        }
-        if (data.website_link) {
-          setWebsiteLink(data.website_link);
-          setIsEditingWebsite(false);
         }
         if (data.custom_link_1) {
           setCustomLink1(data.custom_link_1);
@@ -118,7 +107,7 @@ const GoogleLinkPage: React.FC = () => {
       } else {
         const { error } = await supabase
           .from('businesses')
-          .insert({ owner_id: user.id, review_link: reviewLink, website_link: websiteLink });
+          .insert({ owner_id: user.id, review_link: reviewLink });
         saveError = error;
       }
 
@@ -135,61 +124,6 @@ const GoogleLinkPage: React.FC = () => {
     }
   };
 
-  const handleSaveWebsite = async () => {
-    if (!user) return;
-
-    if (websiteLink && !/^https?:\/\//i.test(websiteLink)) {
-      setErrorWebsite('Website link must start with http:// or https://');
-      return;
-    }
-
-    setLoadingWebsite(true);
-    setErrorWebsite('');
-    setSuccessWebsite(false);
-
-    try {
-      const ownerExists = await ensureOwnerExists();
-      if (!ownerExists) throw new Error("Could not verify business owner profile.");
-
-      // Check if record exists first to avoid unique constraint issues
-      const { data: existing } = await supabase
-        .from('businesses')
-        .select('id')
-        .eq('owner_id', user.id)
-        .maybeSingle();
-
-      let saveError;
-      if (existing) {
-        const { error } = await supabase
-          .from('businesses')
-          .update({ website_link: websiteLink })
-          .eq('owner_id', user.id);
-        saveError = error;
-      } else {
-        const { error } = await supabase
-          .from('businesses')
-          .insert({ 
-            owner_id: user.id, 
-            review_link: reviewLink, 
-            website_link: websiteLink, 
-            custom_link_1: customLink1,
-            custom_link_label_1: customLinkLabel1
-          });
-        saveError = error;
-      }
-
-      if (saveError) throw saveError;
-
-      setSuccessWebsite(true);
-      setIsEditingWebsite(false);
-      setTimeout(() => setSuccessWebsite(false), 3000);
-    } catch (err: any) {
-      console.error("Save error:", err);
-      setErrorWebsite(err.message || 'Failed to save website link');
-    } finally {
-      setLoadingWebsite(false);
-    }
-  };
 
   const handleSaveCustom1 = async () => {
     if (!user) return;
@@ -229,7 +163,6 @@ const GoogleLinkPage: React.FC = () => {
           .insert({ 
             owner_id: user.id, 
             review_link: reviewLink, 
-            website_link: websiteLink, 
             custom_link_1: customLink1,
             custom_link_label_1: customLinkLabel1
           });
@@ -252,7 +185,7 @@ const GoogleLinkPage: React.FC = () => {
   return (
     <div className="max-w-2xl mx-auto p-6 space-y-8 pb-24">
       <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Review & Website Links</h1>
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Review & Custom Links</h1>
         <p className="text-gray-500 dark:text-gray-400">Manage the links your customers will see when they scan your QR code.</p>
       </div>
       
@@ -310,64 +243,6 @@ const GoogleLinkPage: React.FC = () => {
             className="w-full sm:w-auto px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-lg shadow-blue-500/20 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-70"
           >
             {loadingReview ? <Loader2 className="animate-spin" size={20} /> : <><Save size={20} /> Save Review Link</>}
-          </button>
-        )}
-      </div>
-
-      {/* Website Link Card */}
-      <div className="bg-white dark:bg-gray-800 p-6 sm:p-8 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 space-y-6 relative overflow-hidden">
-        <div className="flex justify-between items-start">
-          <div>
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white">Business Website</h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Your main website or social media profile.</p>
-          </div>
-          {!isEditingWebsite && (
-            <button 
-              onClick={() => setIsEditingWebsite(true)}
-              className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 rounded-xl transition-colors flex items-center gap-2 text-sm font-bold"
-            >
-              <Edit2 size={16} />
-              <span className="hidden sm:inline">Edit</span>
-            </button>
-          )}
-        </div>
-
-        <div className="space-y-2">
-          <input 
-            type="text" 
-            value={websiteLink} 
-            onChange={e => setWebsiteLink(e.target.value)} 
-            disabled={!isEditingWebsite}
-            placeholder="https://yourwebsite.com"
-            className={`w-full p-4 border rounded-2xl bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white outline-none transition-all ${
-              !isEditingWebsite 
-                ? 'border-transparent opacity-70 cursor-default' 
-                : 'border-gray-200 dark:border-gray-700 focus:ring-2 focus:ring-blue-500'
-            }`}
-          />
-          {isEditingWebsite && <p className="text-xs text-gray-500 pl-2">Must start with http:// or https://</p>}
-        </div>
-
-        <AnimatePresence mode="wait">
-          {errorWebsite && (
-            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="text-red-500 text-sm flex items-center gap-2">
-              <AlertCircle size={16} /> {errorWebsite}
-            </motion.div>
-          )}
-          {successWebsite && (
-            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="text-green-600 text-sm flex items-center gap-2 font-medium">
-              <CheckCircle2 size={16} /> Link saved successfully!
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {isEditingWebsite && (
-          <button 
-            onClick={handleSaveWebsite}
-            disabled={loadingWebsite}
-            className="w-full sm:w-auto px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-lg shadow-blue-500/20 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-70"
-          >
-            {loadingWebsite ? <Loader2 className="animate-spin" size={20} /> : <><Save size={20} /> Save Website Link</>}
           </button>
         )}
       </div>
@@ -496,43 +371,53 @@ const GoogleLinkPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Website Link Educational Section */}
-      <div className="bg-indigo-50 dark:bg-indigo-900/10 p-8 rounded-3xl border border-indigo-100 dark:border-indigo-900/30 space-y-6">
+      {/* Custom Link Educational Section */}
+      <div className="bg-purple-50 dark:bg-purple-900/10 p-8 rounded-3xl border border-purple-100 dark:border-purple-900/30 space-y-6">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-lg shadow-indigo-500/20">
-            <Globe size={20} />
+          <div className="w-10 h-10 rounded-xl bg-purple-600 flex items-center justify-center text-white shadow-lg shadow-purple-500/20">
+            <Sparkles size={20} />
           </div>
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white">The Power of Your Website Link</h2>
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white">How to use your Custom Link?</h2>
         </div>
 
         <div className="grid gap-6">
           <div className="space-y-2">
             <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
-              <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
-              Digital Menu for Cafes & Restaurants
+              <div className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+              Digital Menu (Cafes & Restaurants)
             </h3>
             <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
-              If you run a cafe or restaurant, link your online menu here. Customers can instantly browse your offerings as soon as they scan, making their experience seamless.
+              Link your PDF menu or website menu. Customers can scan at their table and browse your food instantly without waiting for a physical menu.
             </p>
           </div>
 
           <div className="space-y-2">
             <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
-              <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
-              Showcase Your Services
+              <div className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+              Booking Page (Salons & Services)
             </h3>
             <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
-              Use this link to direct customers to your portfolio, booking page, or a specific service list. It's the first thing they see, so make it count!
+              Direct customers to your Calendly or booking software. Turn a simple visit into a repeat appointment by making it easy to book their next session.
             </p>
           </div>
 
           <div className="space-y-2">
             <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
-              <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
-              Drive Direct Traffic
+              <div className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+              Instagram & Social Media
             </h3>
             <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
-              By placing this link on top, you encourage customers to explore your brand further, increasing the chances of repeat visits and direct bookings.
+              Link your Instagram profile with a label like "Follow us for Updates." It's the best way to turn one-time visitors into long-term followers.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
+              <div className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+              WhatsApp Support
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
+              Use a WhatsApp "wa.me" link so customers can chat with you directly for inquiries or complaints, keeping your service personal and fast.
             </p>
           </div>
         </div>

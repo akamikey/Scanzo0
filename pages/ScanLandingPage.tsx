@@ -226,42 +226,6 @@ export default function ScanLandingPage() {
         </div>
 
         <div className="grid grid-cols-1 gap-4">
-          {/* Explore Business Profile Card */}
-          <motion.div
-            whileHover={!isExpired ? { scale: 1.02, y: -4 } : {}}
-            whileTap={!isExpired ? { scale: 0.98 } : {}}
-            onClick={() => {
-              if (isExpired) return;
-              if (websiteLink) {
-                window.location.href = websiteLink.startsWith('http') ? websiteLink : `https://${websiteLink}`;
-              } else if (businessSlug) {
-                navigate(`/b/${businessSlug}`);
-              }
-            }}
-            className={`p-6 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border border-white/40 dark:border-white/5 shadow-xl rounded-3xl text-left flex items-center gap-5 group transition-all ${
-              isExpired ? 'opacity-60 grayscale cursor-not-allowed' : 'cursor-pointer'
-            }`}
-          >
-            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 transition-all shadow-sm ${
-              isExpired || (!businessSlug && !websiteLink) ? 'bg-gray-200 dark:bg-slate-800 text-gray-400' : 'bg-blue-100 dark:bg-blue-900/30 text-blue-500 group-hover:bg-blue-500 group-hover:text-white'
-            }`}>
-              {isExpired ? <Lock size={24} /> : <Building2 size={28} />}
-            </div>
-            <div className="flex-1">
-              <h3 className={`font-bold text-lg ${isExpired ? 'text-slate-400' : 'text-slate-800 dark:text-white'}`}>
-                {isExpired ? 'Explore Locked' : 'Explore Business'}
-              </h3>
-              <p className="text-sm text-slate-500 dark:text-slate-400">
-                {isExpired ? 'Business inactive' : 'View our services, gallery & more'}
-              </p>
-            </div>
-            {!isExpired && (businessSlug || websiteLink) ? (
-              <ChevronRight className="text-slate-300 dark:text-slate-600 group-hover:text-slate-500 dark:group-hover:text-slate-400 transition-all" />
-            ) : isExpired ? (
-              <Lock size={16} className="text-slate-300 dark:text-slate-600" />
-            ) : null}
-          </motion.div>
-
           {/* Review Card */}
           <motion.div
             whileHover={!isExpired ? { scale: 1.02, y: -4 } : {}}
