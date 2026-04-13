@@ -25,7 +25,10 @@ const SuccessOverlay: React.FC<{ rating: number, reviewLink?: string, isFeedback
     }
   }, [rating, reviewLink]);
 
-  const title = "Feedback submitted";
+  const title = rating >= 4 ? "Thank you for the support!" : "Feedback submitted";
+  const subtitle = rating >= 4 
+    ? "We're redirecting you to Google to share your experience with the world." 
+    : "Your feedback helps businesses improve and grow.";
 
   return (
     <motion.div 
@@ -53,7 +56,7 @@ const SuccessOverlay: React.FC<{ rating: number, reviewLink?: string, isFeedback
             {title}
           </h2>
           <p className="text-slate-500 dark:text-slate-400 font-medium">
-            Your feedback helps businesses improve and grow.
+            {subtitle}
           </p>
         </div>
 
@@ -268,14 +271,46 @@ const PublicReviewPage: React.FC = () => {
     }
   };
 
+  const handlePositiveRedirect = async (selectedRating: number) => {
+    if (!businessId || !ownerId) return;
+    
+    // 1. Save the rating intent to DB immediately
+    try {
+      await fetch('https://senkiwubyxeozgvycwjo.supabase.co/rest/v1/reviews', {
+        method: 'POST',
+        headers: {
+          'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNlbmtpd3VieXhlb3pndnljd2pvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU5NjQyNTMsImV4cCI6MjA4MTU0MDI1M30.97V4aCtU464P2rT6PQn57uUvDsuTpKbsF_vRW0R-3hQ',
+          'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNlbmtpd3VieXhlb3pndnljd2pvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU5NjQyNTMsImV4cCI6MjA4MTU0MDI1M30.97V4aCtU464P2rT6PQn57uUvDsuTpKbsF_vRW0R-3hQ',
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal'
+        },
+        body: JSON.stringify({
+          rating: selectedRating,
+          feedback: 'Positive review redirected to Google',
+          business_id: businessId
+        })
+      });
+    } catch (e) {
+      console.error("Error logging positive intent:", e);
+    }
+
+    // 2. Show success and redirect
+    setRating(selectedRating);
+    setStep('success');
+  };
+
   const handleRatingSelect = (selectedRating: number) => {
     if (isExpired) {
       alert("This business is currently inactive.");
       return;
     }
-    setRating(selectedRating);
-    // Always show feedback form first, even for 4-5 stars
-    setStep('feedback');
+    
+    if (selectedRating >= 4) {
+      handlePositiveRedirect(selectedRating);
+    } else {
+      setRating(selectedRating);
+      setStep('feedback');
+    }
   };
 
   const handleSubmitFeedback = async (e: React.FormEvent) => {

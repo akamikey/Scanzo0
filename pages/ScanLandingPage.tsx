@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { Star, Building2, ChevronRight, AlertCircle, Lock, ExternalLink } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { Star, Building2, ChevronRight, AlertCircle, Lock, ExternalLink, X, Image as ImageIcon } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export default function ScanLandingPage() {
   const { slug, id } = useParams<{ slug?: string, id?: string }>();
@@ -16,6 +16,8 @@ export default function ScanLandingPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isExpired, setIsExpired] = useState(false);
+  const [showGallery, setShowGallery] = useState(false);
+  const [galleryImages, setGalleryImages] = useState<string[]>([]);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -154,6 +156,18 @@ export default function ScanLandingPage() {
     };
   }, [slug, id]);
 
+  const handleCustomLinkClick = () => {
+    if (isExpired || !customLink) return;
+    
+    if (customLink.startsWith('gallery:')) {
+      const images = customLink.replace('gallery:', '').split(',').filter(Boolean);
+      setGalleryImages(images);
+      setShowGallery(true);
+    } else {
+      window.location.href = customLink.startsWith('http') ? customLink : `https://${customLink}`;
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-[100dvh] bg-[#F2F2F7] dark:bg-slate-950 flex flex-col items-center justify-center p-6 text-center">
@@ -202,6 +216,47 @@ export default function ScanLandingPage() {
 
   return (
     <div className={`min-h-[100dvh] bg-[#F2F2F7] dark:bg-slate-950 flex flex-col items-center p-6 relative overflow-hidden font-sans ${isExpired ? 'pt-24 justify-start' : 'justify-center'}`}>
+      {/* Gallery Modal */}
+      <AnimatePresence>
+        {showGallery && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200] bg-black/95 backdrop-blur-sm flex flex-col p-6"
+          >
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-white font-bold text-xl">{customLinkLabel || 'Gallery'}</h2>
+              <button 
+                onClick={() => setShowGallery(false)}
+                className="w-10 h-10 rounded-full bg-white/10 text-white flex items-center justify-center hover:bg-white/20 transition-all"
+              >
+                <X size={24} />
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto space-y-4 pb-10 custom-scrollbar">
+              {galleryImages.map((url, idx) => (
+                <motion.div 
+                  key={idx}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: idx * 0.1 }}
+                  className="w-full rounded-3xl overflow-hidden shadow-2xl"
+                >
+                  <img 
+                    src={url} 
+                    alt={`Gallery ${idx}`} 
+                    className="w-full h-auto object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                </motion.div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Inactive Banner */}
       {isExpired && (
         <div className="fixed top-0 left-0 right-0 bg-amber-500 text-white py-4 px-6 text-center font-bold z-[100] shadow-lg flex items-center justify-center gap-2 text-base animate-pulse">
@@ -264,10 +319,7 @@ export default function ScanLandingPage() {
             <motion.div
               whileHover={!isExpired ? { scale: 1.02, y: -4 } : {}}
               whileTap={!isExpired ? { scale: 0.98 } : {}}
-              onClick={() => {
-                if (isExpired) return;
-                window.location.href = customLink.startsWith('http') ? customLink : `https://${customLink}`;
-              }}
+              onClick={handleCustomLinkClick}
               className={`p-6 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border border-white/40 dark:border-white/5 shadow-xl rounded-3xl text-left flex items-center gap-5 group transition-all ${
                 isExpired ? 'opacity-60 grayscale cursor-not-allowed' : 'cursor-pointer'
               }`}
@@ -275,14 +327,14 @@ export default function ScanLandingPage() {
               <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 transition-all shadow-sm ${
                 isExpired ? 'bg-gray-200 dark:bg-slate-800 text-gray-400' : 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-500 group-hover:bg-indigo-500 group-hover:text-white'
               }`}>
-                {isExpired ? <Lock size={24} /> : <ExternalLink size={28} />}
+                {isExpired ? <Lock size={24} /> : (customLink.startsWith('gallery:') ? <ImageIcon size={28} /> : <ExternalLink size={28} />)}
               </div>
               <div className="flex-1">
                 <h3 className={`font-bold text-lg ${isExpired ? 'text-slate-400' : 'text-slate-800 dark:text-white'}`}>
                   {isExpired ? 'Link Locked' : (customLinkLabel || 'Custom Link')}
                 </h3>
                 <p className="text-sm text-slate-500 dark:text-slate-400">
-                  {isExpired ? 'Business inactive' : 'Visit our external link'}
+                  {isExpired ? 'Business inactive' : (customLink.startsWith('gallery:') ? 'View our photo gallery' : 'Visit our external link')}
                 </p>
               </div>
               {!isExpired ? (

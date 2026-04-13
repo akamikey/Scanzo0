@@ -102,14 +102,19 @@ export default function BusinessBuilder() {
     
     try {
       const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}-${Math.random()}.${fileExt}`;
-      const filePath = `${fileName}`;
+      const fileName = `${Math.random()}.${fileExt}`;
+      const filePath = `${user.id}/${fileName}`;
+
+      console.log(`Attempting upload to ${bucket}: ${filePath}`);
 
       const { error: uploadError } = await supabase.storage
         .from(bucket)
         .upload(filePath, file);
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error(`Supabase Storage Error (${bucket}):`, uploadError);
+        throw uploadError;
+      }
 
       const { data: { publicUrl } } = supabase.storage
         .from(bucket)
@@ -129,14 +134,19 @@ export default function BusinessBuilder() {
     
     try {
       const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}-${Math.random()}.${fileExt}`;
-      const filePath = `${fileName}`;
+      const fileName = `${Math.random()}.${fileExt}`;
+      const filePath = `${user.id}/${fileName}`;
+
+      console.log(`Attempting gallery upload to business-gallery: ${filePath}`);
 
       const { error: uploadError } = await supabase.storage
         .from('business-gallery')
         .upload(filePath, file);
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error("Supabase Storage Gallery Error:", uploadError);
+        throw uploadError;
+      }
 
       const { data: { publicUrl } } = supabase.storage
         .from('business-gallery')

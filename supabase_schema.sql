@@ -23,6 +23,12 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'businesses' AND column_name = 'website_link') THEN
         ALTER TABLE public.businesses ADD COLUMN website_link TEXT;
     END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'businesses' AND column_name = 'custom_link_1') THEN
+        ALTER TABLE public.businesses ADD COLUMN custom_link_1 TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'businesses' AND column_name = 'custom_link_label_1') THEN
+        ALTER TABLE public.businesses ADD COLUMN custom_link_label_1 TEXT;
+    END IF;
 END $$;
 
 -- 3. Enable Row Level Security (RLS)

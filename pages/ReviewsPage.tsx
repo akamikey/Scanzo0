@@ -221,8 +221,14 @@ const ReviewsPage: React.FC = () => {
                           </span>
                           <StarRating rating={review.rating} />
                         </div>
-                        <p className="text-gray-600 dark:text-gray-300 text-sm leading-relaxed italic">
-                          "{review.feedback || review.comment || review.message || 'No comment provided'}"
+                        <p className={`text-sm leading-relaxed ${
+                          review.feedback === 'Positive review redirected to Google' 
+                            ? 'text-blue-500 font-bold' 
+                            : 'text-gray-600 dark:text-gray-300 italic'
+                        }`}>
+                          {review.feedback === 'Positive review redirected to Google' 
+                            ? '✨ Redirected to Google Review' 
+                            : `"${review.feedback || review.comment || review.message || 'No comment provided'}"`}
                         </p>
                       </div>
                     </div>

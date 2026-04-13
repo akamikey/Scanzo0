@@ -13,10 +13,12 @@ import {
   Globe,
   Facebook,
   Twitter,
-  Youtube
+  Youtube,
+  X,
+  Image as ImageIcon
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface BusinessPage {
   id: string;
@@ -64,6 +66,8 @@ const PublicBusinessPage: React.FC = () => {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [isExpired, setIsExpired] = useState(false);
   const [links, setLinks] = useState<any>(null);
+  const [showGallery, setShowGallery] = useState(false);
+  const [galleryImages, setGalleryImages] = useState<string[]>([]);
 
   useEffect(() => {
     let subscriptionChannel: any = null;
@@ -207,6 +211,17 @@ const PublicBusinessPage: React.FC = () => {
     }
   };
 
+  const handleCustomLinkClick = (e: React.MouseEvent) => {
+    if (isExpired || !links?.custom_link_1) return;
+    
+    if (links.custom_link_1.startsWith('gallery:')) {
+      e.preventDefault();
+      const images = links.custom_link_1.replace('gallery:', '').split(',').filter(Boolean);
+      setGalleryImages(images);
+      setShowGallery(true);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-black p-6">
@@ -290,6 +305,47 @@ const PublicBusinessPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black pb-20">
       
+      {/* Gallery Modal */}
+      <AnimatePresence>
+        {showGallery && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200] bg-black/95 backdrop-blur-sm flex flex-col p-6"
+          >
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-white font-bold text-xl">{links?.custom_link_label_1 || 'Gallery'}</h2>
+              <button 
+                onClick={() => setShowGallery(false)}
+                className="w-10 h-10 rounded-full bg-white/10 text-white flex items-center justify-center hover:bg-white/20 transition-all"
+              >
+                <X size={24} />
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto space-y-4 pb-10 custom-scrollbar">
+              {galleryImages.map((url, idx) => (
+                <motion.div 
+                  key={idx}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: idx * 0.1 }}
+                  className="w-full rounded-3xl overflow-hidden shadow-2xl"
+                >
+                  <img 
+                    src={url} 
+                    alt={`Gallery ${idx}`} 
+                    className="w-full h-auto object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                </motion.div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Hero Section */}
       <div className="relative h-64 md:h-80 w-full overflow-hidden">
         {page.cover_url ? (
@@ -388,17 +444,17 @@ const PublicBusinessPage: React.FC = () => {
             )}
             {links?.custom_link_1 && (
               <a 
-                href={!isExpired ? links.custom_link_1 : undefined}
-                target={!isExpired ? "_blank" : undefined}
-                rel={!isExpired ? "noopener noreferrer" : undefined}
-                onClick={(e) => isExpired && e.preventDefault()}
+                href={!isExpired && !links.custom_link_1.startsWith('gallery:') ? links.custom_link_1 : undefined}
+                target={!isExpired && !links.custom_link_1.startsWith('gallery:') ? "_blank" : undefined}
+                rel={!isExpired && !links.custom_link_1.startsWith('gallery:') ? "noopener noreferrer" : undefined}
+                onClick={handleCustomLinkClick}
                 className={`flex flex-col items-center justify-center gap-2 py-4 rounded-2xl font-bold shadow-lg transition-all ${
                   isExpired 
                     ? 'bg-gray-200 dark:bg-white/5 text-gray-400 cursor-not-allowed grayscale' 
                     : 'bg-indigo-500 text-white hover:bg-indigo-600 active:scale-95'
                 }`}
               >
-                <ExternalLink size={24} />
+                {links.custom_link_1.startsWith('gallery:') ? <ImageIcon size={24} /> : <ExternalLink size={24} />}
                 <span className="text-sm">{isExpired ? 'Link Locked' : (links.custom_link_label_1 || 'Custom Link')}</span>
               </a>
             )}
